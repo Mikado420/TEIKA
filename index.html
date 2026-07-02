@@ -55,13 +55,13 @@
       overflow: hidden;
     }
     
-    /* 行の縦ズレをピクセル単位で解消するために left: 42px への同期と padding、line-heightの絶対指定を統一 */
+    /* 2. 【自動改行ズレ修正】行の縦ズレをピクセル単位で解消するために left: 42px への同期と padding、line-heightの絶対指定を統一 */
     .editor-container .backdrop {
       position: absolute;
       left: 42px; right: 0; top: 0; bottom: 0;
       padding: 6px 8px;
       margin: 0;
-      border: 1px solid transparent;
+      border: none !important; /* 【バグ修正】1pxボーダーによるズレを防ぐため境界線を完全に排除（border:none） */
       box-sizing: border-box;
       pointer-events: none;
       overflow-y: scroll;
@@ -755,7 +755,7 @@ function parseTJAForPreview(text) {
             } 
         } 
         while (commandIndex < commandsInMeasure.length) { 
-            parseCommand(commandsInMeasure[commandIndex].commandStr); 
+            parseCommand(commandIndex); 
             commandIndex++; 
         } 
     }
@@ -887,7 +887,7 @@ function drawBalloon(ctx, ri, nb, eb, count) {
   
   ctx.save();
   
-  // 【解決】renderPath（rows依存）から直線（drawLine）描画にマッピング変更することで「Can't find variable: rows」エラーを根本解決
+  // 【不具合修正】rowsの未定義バグ（Can't find variable: rows）を、rows依存のrenderPathを廃止し直接的な直線描画（drawLine）に差し替えて根本解決
   ctx.lineCap = 'round';
   ctx.strokeStyle = strokeColor;
   ctx.lineWidth = size * 2;
@@ -945,18 +945,27 @@ function drawChart(chart, courseId) {
       const mb = (m.length[0]/m.length[1])*4;
       m.events.forEach(e => {
         const eb = bAcc + (mb / (m.data.length || 1)) * e.pos;
-        if (e.name === 'gogostart') { gActive = true; gStart = [ri, eb]; }
+        if (e.name === 'gogostart') { 
+          gActive = true; 
+          gStart = [ri, eb, false]; // イベントでの新規開始のため isInherited は false に設定
+        }
         if (e.name === 'gogoend' && gActive) {
           const hG = ROW_HEIGHT;
           if (gStart[0] === ri) {
-            // 1. 【ゴーゴー背景の描画拡張】引き継がれている際の左端（画面外 0px）へのはみ出し同期処理
-            const startX = (gStart[1] === 0 && ri > 0) ? 0 : getNoteX(gStart[1]);
+            // 3. 【ゴーゴー背景の描画条件の厳密化】左側のはみ出し。引き継がれている場合(isInherited==true)のみ左端0pxまで、新規開始時は小節頭getNoteXから
+            const isInherited = gStart[2];
+            const startX = isInherited ? 0 : getNoteX(gStart[1]);
             drawRect(ctx, startX, getRowY(ri), getNoteX(eb)-startX, hG, '#fbb');
           } else { 
             // 前の行からの引き継ぎ時
-            const startX = (gStart[1] === 0 && gStart[0] > 0) ? 0 : getNoteX(gStart[1]);
+            const isInherited = gStart[2];
+            const startX = isInherited ? 0 : getNoteX(gStart[1]);
+            
+            // 開始行は引き継ぎフラグに応じて左端(0)または小節頭(getNoteX)から
             drawRect(ctx, startX, getRowY(gStart[0]), cW - startX, hG, '#fbb'); 
             for(let r=gStart[0]+1; r<ri; r++) drawRect(ctx, 0, getRowY(r), cW, hG, '#fbb'); 
+            
+            // 終了行(ri)は必ず前のレーンから引き継がれて終わるため、左端(0)からはみ出して繋げる
             drawRect(ctx, 0, getRowY(ri), getNoteX(eb), hG, '#fbb'); 
           }
           gStart = null; gActive = false;
@@ -965,9 +974,16 @@ function drawChart(chart, courseId) {
       bAcc += mb;
     });
     if (gActive && gStart) { 
-      // 1. 【ゴーゴー背景の描画拡張】行末で続いている場合も左端（0px）を考慮して右端まで綺麗に繋げる
-      const startX = (gStart[1] === 0 && gStart[0] > 0) ? 0 : getNoteX(gStart[1]);
-      drawRect(ctx, startX, getRowY(gStart[0]), cW - startX, ROW_HEIGHT, '#fbb'); 
+      // 3. 【ゴーゴー背景の描画条件の厳密化】行末でまだ続いている場合の描画
+      const isInherited = gStart[2];
+      const startX = isInherited ? 0 : getNoteX(gStart[1]);
+      
+      if (gStart[0] === ri) {
+        drawRect(ctx, startX, getRowY(ri), cW - startX, ROW_HEIGHT, '#fbb'); 
+      } else {
+        drawRect(ctx, startX, getRowY(gStart[0]), cW - startX, ROW_HEIGHT, '#fbb'); 
+        for(let r=gStart[0]+1; r<ri; r++) drawRect(ctx, 0, getRowY(r), cW, ROW_HEIGHT, '#fbb'); 
+      }
       gStart = [ri+1, 0]; 
     }
   });
@@ -1329,7 +1345,7 @@ let autoLastSide = 'L'; // 初期値 L (全体で一括管理して左右をト�
 // 位置基準の優先順位（値が大きい＝右側、先に処理・描画する優先度）
 const positionPriority = { kaR: 4, donR: 3, donL: 2, kaL: 1 };
 
-// jiroCanvasとjiroCtxのスコープをグローバルで宣言。DOM生成前にバインドされるエラーを根本解決
+// jiroCanvasとjiroCtx of スコープをグローバルで宣言。DOM生成前にバインドされるエラーを根本解決
 let jiroCanvas = null;
 let jiroCtx = null;
 
@@ -2262,7 +2278,7 @@ function updateJiroPreview(time = currentElapsedTime) {
             const pixelsPerSecondX_End = BASE_SCROLL_FACTOR * bpm * scroll * scrollMultiplier;
             const endTimeDiff = note.endTime - elapsedTime;
             const endX = HIT_POSITION_X + endTimeDiff * pixelsPerSecondX_End;
-            let displayX = x, stayAtHitPos = false;
+            let displayX = x, stayAtHitPos = false; // 【解決】stayAtPosを正しい宣言名の stayAtHitPos に統合して未定義変数エラーを完全修正
             if (note.judgeResult === 'pending') {
                 if (elapsedTime <= note.endTime) {
                     if (pixelsPerSecondX > 0) {
@@ -2543,6 +2559,25 @@ function resetSimulation() {
     setChartTime(0);
 }
 
+// 2.【再生速度】速度変更・同期キャリブレーション機能（再生中のシームレスな速度切替時に、基準時間を再補正して譜面と音源のズレやループ停止を防止）
+u('#jiro-speed').on('change', (e) => {
+    const newSpeed = parseFloat(e.target.value) || 1.0;
+    if (isPlaying) {
+        // 現在の経過位置を一時退避
+        const currentElapsedTimeTemp = currentElapsedTime;
+        
+        // 再生中のPlaybackRateを同期変更
+        if (musicSourceNode) {
+            musicSourceNode.playbackRate.value = newSpeed;
+        }
+        
+        // 【核心解決】時間のワープ・強制停止を防ぐため、基準Offsetと現在時刻(audioContext.currentTime)をキャリブレーション再補正
+        simulationStartOffset = currentElapsedTimeTemp;
+        simulationStartTime = (audioContext) ? audioContext.currentTime : 0;
+    }
+    playbackSpeed = newSpeed;
+});
+
 function findMeasureIndex(time) {
     if (!currentChartData) return 0;
     let index = 0;
@@ -2623,7 +2658,7 @@ function autoHitCheck(elapsedTime) {
                     triggerAutoHitSide(noteHitType, elapsedTime);
 
                     if (note.type === '7' && note.hits > 0 && note.currentHits >= note.hits) {
-                        note.judgeResult === 'hit';
+                        note.judgeResult = 'hit';
                         playSE('balloon');
                     }
                 }
@@ -2733,15 +2768,6 @@ function drawLoop(timestamp) {
 // プレビュー操作バインディング
 u('#jiro-btn-play').on('click', togglePlay);
 u('#jiro-btn-stop').on('click', resetSimulation);
-
-// 2.【再生速度】速度変更変更イベント
-u('#jiro-speed').on('change', (e) => {
-    playbackSpeed = parseFloat(e.target.value) || 1.0;
-    if (isPlaying && musicSourceNode) {
-        // 再生中の場合はPlaybackRateを動的に切り替える
-        musicSourceNode.playbackRate.value = playbackSpeed;
-    }
-});
 
 // 小節送りボタンのクリックイベント定義
 u('#jiro-btn-prev').on('click', () => {
@@ -2889,7 +2915,12 @@ document.addEventListener('visibilitychange', async () => {
         // 裏に回る前に再生中だった場合は自動で正確なタイムスタンプからプレビュー演奏をシームレス再開
         if (wasPlayingBeforeHidden) {
             wasPlayingBeforeHidden = false;
-            startSimulation();
+            // 完全に resume されたことを保証（または少し遅延）させてから同期再生を安定開始
+            setTimeout(() => {
+                if (!isPlaying) {
+                    startSimulation();
+                }
+            }, 100);
         } else {
             updateJiroPreview(currentElapsedTime);
         }
@@ -2903,6 +2934,13 @@ window.addEventListener('focus', async () => {
     }
     updateJiroPreview(currentElapsedTime);
 });
+
+// スマホ環境の救済策: 画面タッチ時に AudioContext を確実にアクティブ復帰
+window.addEventListener('touchstart', async () => {
+    if (audioContext && audioContext.state === 'suspended') {
+        try { await audioContext.resume(); } catch(e){}
+    }
+}, { passive: true });
 
 // 自動ロード & データベース初期化
 window.addEventListener('DOMContentLoaded', async () => {
