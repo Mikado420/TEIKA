@@ -755,7 +755,7 @@ function parseTJAForPreview(text) {
             } 
         } 
         while (commandIndex < commandsInMeasure.length) { 
-            parseCommand(commandIndex); 
+            parseCommand(commandsInMeasure[commandIndex].commandStr); 
             commandIndex++; 
         } 
     }
@@ -941,6 +941,10 @@ function drawChart(chart, courseId) {
   let gActive = false, gStart = null;
   rows.forEach((row, ri) => {
     let bAcc = 0;
+    
+    // 行の開始時。もし前の行からゴーゴータイムが引き継がれている場合、
+    // すでに gStart は前の行の末尾で [ri, 0, true] に設定されている
+    
     row.measures.forEach(m => {
       const mb = (m.length[0]/m.length[1])*4;
       m.events.forEach(e => {
@@ -949,42 +953,31 @@ function drawChart(chart, courseId) {
           gActive = true; 
           gStart = [ri, eb, false]; // イベントでの新規開始のため isInherited は false に設定
         }
-        if (e.name === 'gogoend' && gActive) {
+        if (e.name === 'gogoend' && gActive && gStart) {
           const hG = ROW_HEIGHT;
-          if (gStart[0] === ri) {
-            // 3. 【ゴーゴー背景の描画条件の厳密化】左側のはみ出し。引き継がれている場合(isInherited==true)のみ左端0pxまで、新規開始時は小節頭getNoteXから
-            const isInherited = gStart[2];
-            const startX = isInherited ? 0 : getNoteX(gStart[1]);
-            drawRect(ctx, startX, getRowY(ri), getNoteX(eb)-startX, hG, '#fbb');
-          } else { 
-            // 前の行からの引き継ぎ時
-            const isInherited = gStart[2];
-            const startX = isInherited ? 0 : getNoteX(gStart[1]);
-            
-            // 開始行は引き継ぎフラグに応じて左端(0)または小節頭(getNoteX)から
-            drawRect(ctx, startX, getRowY(gStart[0]), cW - startX, hG, '#fbb'); 
-            for(let r=gStart[0]+1; r<ri; r++) drawRect(ctx, 0, getRowY(r), cW, hG, '#fbb'); 
-            
-            // 終了行(ri)は必ず前のレーンから引き継がれて終わるため、左端(0)からはみ出して繋げる
-            drawRect(ctx, 0, getRowY(ri), getNoteX(eb), hG, '#fbb'); 
-          }
+          const isInherited = gStart[2];
+          const startX = isInherited ? 0 : getNoteX(gStart[1]); // 引き継ぎなら左端はみ出し、新規ならノーツ位置から
+          
+          // その行（ri）の、ゴーゴー開始位置から終了位置 getNoteX(eb) までを塗る
+          drawRect(ctx, startX, getRowY(ri), getNoteX(eb) - startX, hG, '#fbb');
+          
           gStart = null; gActive = false;
         }
       });
       bAcc += mb;
     });
+    
+    // 3. 【正常化維持】行の末尾に達した時、まだゴーゴータイムが継続している場合のバトンリレー描画（引き継ぎ処理）
     if (gActive && gStart) { 
-      // 3. 【ゴーゴー背景の描画条件の厳密化】行末でまだ続いている場合の描画
+      const hG = ROW_HEIGHT;
       const isInherited = gStart[2];
       const startX = isInherited ? 0 : getNoteX(gStart[1]);
       
-      if (gStart[0] === ri) {
-        drawRect(ctx, startX, getRowY(ri), cW - startX, ROW_HEIGHT, '#fbb'); 
-      } else {
-        drawRect(ctx, startX, getRowY(gStart[0]), cW - startX, ROW_HEIGHT, '#fbb'); 
-        for(let r=gStart[0]+1; r<ri; r++) drawRect(ctx, 0, getRowY(r), cW, ROW_HEIGHT, '#fbb'); 
-      }
-      gStart = [ri+1, 0]; 
+      // その行の、ゴーゴー開始位置から右端（画面外 cW）までを塗る
+      drawRect(ctx, startX, getRowY(ri), cW - startX, hG, '#fbb'); 
+      
+      // 次の行（ri + 1）へバトンを渡す。開始位置は 0、引き継ぎフラグは true にセット！
+      gStart = [ri + 1, 0, true]; 
     }
   });
 
@@ -1606,7 +1599,7 @@ const textarea = u('.input').first();
 const backdrop = u('.backdrop').first();
 const highlightDiv = u('.highlight').first();
 
-// 1. 【小節番号配置ロジックの修正】#START～#END内のみカウントし、「小節の開始行（小節頭）」に小節番号（数字のみ）を完全自動同期して配置
+// 2. 【小節番号同期不具合の修正】1行の中にカンマ（,）が複数存在する場合や改行時の不整合を防ぐため、カンマ数を正確に計上してリンクさせる
 function updateLineNumbers(text) {
   const lineNumbers = u('.line-numbers').first();
   if (!lineNumbers) return;
@@ -1643,10 +1636,11 @@ function updateLineNumbers(text) {
           currentMeasureStartLineIndex = i;
           measureStartMap[i] = currentMeasureNum;
         }
-        if (rawLine.includes(',')) {
-          // カンマ検出で小節が区切られるため、その次の有効行を新しい小節開始とする
+        // 【解決】1行に複数のカンマがある譜面スタイル等に対応するため、カンマの正確な出現個数をカウントして小節インデックスを進める
+        const commaCount = (rawLine.match(/,/g) || []).length;
+        if (commaCount > 0) {
           currentMeasureStartLineIndex = null;
-          currentMeasureNum++;
+          currentMeasureNum += commaCount;
         }
       }
     }
@@ -1750,6 +1744,8 @@ const processFunc = () => {
         setChartTime(currentElapsedTime);
       }
 
+      // 1. 【バグ修正】エディタの入力テキスト変更をトリガーに、キャッシュCanvasを確実に更新し譜面画像を即座にリアルタイム再生成・更新
+      isChartCacheDirty = true; 
       updateUI();
       u('.errors').text('No error');
       
