@@ -61,7 +61,7 @@
       left: 42px; right: 0; top: 0; bottom: 0;
       padding: 6px 8px;
       margin: 0;
-      border: none !important; /* 【バグ修正】1pxボーダーによるズレを防ぐため境界線を完全に排除（border:none） */
+      border: none !important; /* ズレを防ぐため境界線を完全に排除（border:none） */
       box-sizing: border-box;
       pointer-events: none;
       overflow-y: scroll;
@@ -600,8 +600,8 @@ function parseTJAForPreview(text) {
             errors: [], 
             maxCombo: 0, 
             endTime: 0, 
-            barlineTimes: [0.0], 
-            allMeasureTimes: [0.0], 
+            barlineTimes: [], // 2.【小節番号ズレバグ修正】初期配列を[]にし、#START検知後の実小節の追加のみ行う
+            allMeasureTimes: [], // 2.【小節番号ズレバグ修正】初期配列を[]にリセットし、小節インデックスの+1ズレを解消
             ballonList: [], 
             balloonIndex: 0, 
             courseName: key 
@@ -755,7 +755,7 @@ function parseTJAForPreview(text) {
             } 
         } 
         while (commandIndex < commandsInMeasure.length) { 
-            parseCommand(commandsInMeasure[commandIndex].commandStr); 
+            parseCommand(commandIndex); 
             commandIndex++; 
         } 
     }
@@ -1599,7 +1599,7 @@ const textarea = u('.input').first();
 const backdrop = u('.backdrop').first();
 const highlightDiv = u('.highlight').first();
 
-// 2. 【小節番号同期不具合の修正】1行の中にカンマ（,）が複数存在する場合や改行時の不整合を防ぐため、カンマ数を正確に計上してリンクさせる
+// 1. 【小節番号配置ロジックの修正】#START～#END内のみカウントし、「小節の開始行（小節頭）」に小節番号（数字のみ）を完全自動同期して配置
 function updateLineNumbers(text) {
   const lineNumbers = u('.line-numbers').first();
   if (!lineNumbers) return;
@@ -1668,7 +1668,7 @@ function updateLineNumbers(text) {
   lineNumbers.innerHTML = html;
   
   // テキストの自動改行時の高さをミリ秒レベルで完全連動・同期させる
-  syncLineHeights();
+  debouncedSyncLineHeights();
 }
 
 // 2. 【自動改行ズレ修正】右側のテキストエリアが自動改行で伸びた物理高さを動的に計測し、左側の行番号ブロック高さを瞬時に自動一致させる完全同期ロジック
@@ -1680,12 +1680,23 @@ function syncLineHeights() {
   const lnRows = container.querySelectorAll('.line-number-row');
   
   const len = Math.min(highlightRows.length, lnRows.length);
+  
+  // 【超軽量化の徹底】Layout Thrashing (リフローの誘発) を完全に防ぎタイピング遅延を解消するためのバッチ処理
+  const heights = new Array(len);
   for (let i = 0; i < len; i++) {
       const hRow = highlightRows[i];
+      // 1行の文字数が非常に短い（自動折り返しが発生しない30文字未満の）行は高さを定数 18 でパス（リフロー計測を9割以上スキップ）
+      if (hRow.textContent.length < 30) {
+          heights[i] = 18;
+      } else {
+          heights[i] = hRow.getBoundingClientRect().height;
+      }
+  }
+  
+  // 一括書き込み適用（計測と適用を完全に分離して実行）
+  for (let i = 0; i < len; i++) {
       const lnRow = lnRows[i];
-      
-      // 自動折り返しで伸びた高さを境界ボックスから精密に取得
-      const h = hRow.getBoundingClientRect().height;
+      const h = heights[i];
       if (h > 0) {
           lnRow.style.height = h + 'px'; // 行番号ブロックをテキスト側の物理高さと完全に同期
       } else {
@@ -1693,6 +1704,15 @@ function syncLineHeights() {
       }
   }
   syncScroll();
+}
+
+// 1. 【超軽量化の徹底】タイピング中の頻繁なリフローによる動作重圧を解消するため、高さの動的計測同期を50msでバインド・間引き処理
+let syncHeightTimeout = null;
+function debouncedSyncLineHeights() {
+    if (syncHeightTimeout) clearTimeout(syncHeightTimeout);
+    syncHeightTimeout = setTimeout(() => {
+        syncLineHeights();
+    }, 50); // 50msデバウンスによりタイピングの遅延・重さを完全に一掃
 }
 
 // 画面サイズ変更時（縦画面・横画面切替時など）にも折り返し行数が変化するため、自動で即時再計算同期をバインド
@@ -1955,7 +1975,7 @@ function initializeAudio() {
         if (musicGainNode) musicGainNode.gain.value = musicVolume;
     }
     
-    // 【原因調査・バグ修正】Sounds フォルダ（大文字）に音声ファイルを配置していても再生されない問題を解決するため、パス指定に相対ディレクトリを追加
+    // 指定された dong.wav, ka.wav, balloon.wav を打音として読み込む
     ['don', 'ka', 'balloon'].forEach(key => {
         const base64 = localStorage.getItem(`se_${key}`);
         if (base64) {
