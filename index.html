@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>作譜補助ツール Pro</title>
+  <title>TJA Tools+</title>
   <script src="https://unpkg.com/umbrellajs@3.3.0/umbrella.min.js"></script>
   <script src="https://d3js.org/d3.v7.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -362,7 +362,7 @@
       padding: 4px 10px !important;
     }
 
-    /* スマートフォン縦画面専用のCSS設計 (自動折り返しを強制無効化) */
+    /* 2. 【要件2】スマートフォン縦画面専用のCSS設計 (自動折り返しを強制無効化) */
     @media (max-width: 768px) {
       .editor-container .backdrop, .area-editor .input, .editor-container .line-numbers {
         font-size: 11px !important;
@@ -383,7 +383,7 @@
 <main class="pane-main">
   <section class="pane-left">
     <div class="area-editor">
-      <!-- 【レイアウト修正】「TJA EDITOR」の表記エリアを完全に削除し、エディタ縦幅を上方向に拡張 -->
+      <!-- 1. 【レイアウト修正】「TJA EDITOR」の表記エリアを完全に削除し、エディタ縦幅を上方向に拡張 -->
       <div class="editor-container">
         <div class="line-numbers"></div>
         <div class="backdrop"><div class="highlight"></div></div>
@@ -401,18 +401,12 @@
       <div class="page page-preview is-hidden">
         <div style="width: 100%; display: flex; flex-direction: column; background: #16161a; padding: 10px; border-radius: 6px; border: 1px solid #222227; box-shadow: 0 4px 20px rgba(0,0,0,0.3);">
           
-          <!-- プレビュー枠 (生CSSプロパティの完全固定により、太鼓のマスク背景が枠外にはみ出る不具合を物理的に防止) -->
+          <!-- プレビュー枠 (【要件1: 描画レイヤーの完全固定】絶対的なインラインスタイルへの完全置換による、太鼓画像やコンボ数表示のはみ出し・重なりバグ防止) -->
           <div id="jiro-preview-container" style="width: 100%; background: #09090b; border: 2px solid #2c2c35; height: 150px; outline: none; touch-action: none; user-select: none; border-radius: 6px; position: relative; overflow: hidden !important;" tabindex="0">
             <div class="lane" style="position: absolute; top: 0; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.15); border-top: 1px solid rgba(255,255,255,0.1); border-bottom: 1px solid rgba(255,255,255,0.1);"></div>
             
-            <!-- 【要件2】小節番号・再生時間・BPM・拍子をリアルタイムに同時監視表示するフローティング統合インフォバッジ -->
-            <div id="jiro-measure-display" class="absolute pointer-events-none text-white rounded" style="position: absolute; left: 120px; top: 8px; z-index: 30; font-size: 10px; font-weight: 600; background: rgba(0,0,0,0.75); padding: 3px 8px; white-space: nowrap; border: 1px solid #333; display: flex; gap: 8px; align-items: center; font-family: monospace;">
-              <span id="jiro-display-measure">小節: 0 / 0</span>
-              <span style="color: #444; font-weight: normal;">|</span>
-              <span id="jiro-display-bpm" style="color: #58a6ff;">BPM: 120</span>
-              <span style="color: #444; font-weight: normal;">|</span>
-              <span id="jiro-display-beat" style="color: #ffaa00;">拍子: 4/4</span>
-            </div>
+            <!-- 小節番号・再生時間などを表示するレイヤー (z-index 30で太鼓のCanvas z-index 20より前面に配置) -->
+            <div id="jiro-measure-display" class="absolute pointer-events-none text-white rounded" style="position: absolute; left: 120px; top: 8px; z-index: 30; font-size: 10px; font-weight: 600; background: rgba(0,0,0,0.75); padding: 2px 6px; white-space: nowrap; border: 1px solid #333;">小節: 0 / 0</div>
             
             <canvas id="jiro-previewCanvas" style="position: absolute; top: 0; left: 0; width: 100% !important; height: 100% !important; z-index: 20; pointer-events: none;"></canvas>
           </div>
@@ -568,9 +562,6 @@
 const CHART_PADDING_TOP = 130, CHART_PADDING_BOTTOM = 20, CHART_BG = '#cccccc';
 const ROW_MARGIN_BOTTOM = 20, ROW_HEIGHT_INFO = 18, ROW_HEIGHT_NOTE = 34, ROW_HEIGHT = ROW_HEIGHT_INFO + ROW_HEIGHT_NOTE;
 const ROW_OFFSET_NOTE_CENTER = ROW_HEIGHT_INFO + (ROW_HEIGHT_NOTE / 2), ROW_LEADING = 30, ROW_TRAILING = 30, BEAT_WIDTH = 48, NOTE_RADIUS = 9;
-
-// 【最優先修正】Temporal Dead Zone (TDZ) による「Can't find variable: errorLineNumber」未定義エラーを100%防止するため最上部で宣言
-let errorLineNumber = null; 
 
 const formatBpm = (val) => Math.round(val * 1000) / 1000;
 const getNoteX = (beat) => ROW_LEADING + (beat * BEAT_WIDTH);
@@ -1131,7 +1122,7 @@ function parseTJAForPreview(text) {
         chart.commands.sort((a, b) => a.time - b.time); 
         chart.endTime = (chart.notes.length > 0) ? chart.notes.reduce((max, note) => Math.max(max, note.endTime || note.time), 0) : 0; 
         
-        // 事前分類・ソートしてキャッシュ
+        // 【要件3】事前分類・ソートしてキャッシュ
         chart.drawBarlines = chart.notes.filter(n => n.type === 'BARLINE');
         chart.drawNormalNotes = chart.notes.filter(n => n.type !== 'BARLINE');
     } 
@@ -1546,8 +1537,8 @@ let wasPlayingBeforeHidden = false;
 let currentElapsedTime = 0.0;
 let simulationStartOffset = 0.0;
 let simulationStartTime = 0.0;
-let lastFrameTime = 0; // 描画ループのFPSリミッター判定用
-let lastLogicTime = 0; // updateLogicの経過時間（フォールバック用）計測専用
+let lastFrameTime = 0; // 【要件1: 修正】描画ループのFPSリミッター判定用
+let lastLogicTime = 0; // 【要件1: 修正】updateLogicの経過時間（フォールバック用）計測専用
 let animationFrameId = null;
 let logicIntervalId = null;
 
@@ -1571,7 +1562,7 @@ let playerKeys = { donL: ['F'], donR: ['J'], kaL: ['D'], kaR: ['K'] };
 let lastSEPlayTime = { don: 0, ka: 0, balloon: 0 };
 let hitEffectTimeout = { donLeft: null, donRight: null, kaLeft: null, kaRight: null };
 
-// 判定円座標は175固定
+// 【要件1】判定円座標は175固定
 const HIT_POSITION_X_DEFAULT = 175;
 const HIT_POSITION_X = 175;
 const BASE_SCROLL_FACTOR = 2.0;
@@ -1584,7 +1575,6 @@ const JUDGE_PERFECT = 0.025, JUDGE_GOOD = 0.075, JUDGE_BAD = 0.107;
 
 let state_commandIndex = 0;
 let state_currentBPM = 120;
-let state_currentBeat = "4/4"; // 【要件3】拍子(MEASURE)を管理するグローバルステートを追加
 let state_isGogo = false;
 let state_jposStartTime = -Infinity;
 let state_jposDuration = 0;
@@ -1784,6 +1774,89 @@ function updateUI() {
   }
 }
 
+/** エディタ文字色分け用のハイライトヘルパー (要件3仕様維持) **/
+let errorLineNumber = null; 
+
+function escapeHtml(string) {
+  return string.replace(/&/g, '&amp;')
+               .replace(/</g, '&lt;')
+               .replace(/>/g, '&gt;')
+               .replace(/"/g, '&quot;')
+               .replace(/'/g, '&#039;');
+}
+
+function highlightTJA(text) {
+  const lines = text.split('\n');
+  let rendaState = 0; // 0:通常, 5:黄連打中, 7:風船中
+  let inActiveChart = false; // #START〜#END の区間をトラッキング
+
+  const highlightedLines = lines.map((line) => {
+    const trimmed = line.trim();
+    const upperLine = trimmed.toUpperCase();
+    let lineHtml = "";
+    
+    // 行をトリムしたものが#STARTならアクティブ区間開始
+    if (upperLine.startsWith('#START')) {
+      inActiveChart = true;
+    }
+    
+    if (trimmed.startsWith('//')) {
+      // コメント: 薄いグレー
+      lineHtml = `<span style="color: #6e7681; font-style: italic;">${escapeHtml(line)}</span>`;
+    } else if (trimmed.startsWith('#')) {
+      // 命令コマンド: 鮮やかなブルー（太字）
+      lineHtml = `<span style="color: #58a6ff; font-weight: bold;">${escapeHtml(line)}</span>`; 
+      
+      // #END が現れたらアクティブ区間終了
+      if (upperLine.startsWith('#END')) {
+        inActiveChart = false;
+      }
+    } else if (/^[A-Z0-9_\-]+:/.test(trimmed.toUpperCase())) {
+      // ヘッダー要素: 白色（太字）
+      lineHtml = `<span style="color: #e3e3e6; font-weight: bold;">${escapeHtml(line)}</span>`;
+    } else {
+      // 譜面データ（ノーツ）: 1文字ずつカラー判定して色分け復元
+      let result = "";
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        const escapedChar = escapeHtml(char);
+        const textShadow = "text-shadow: 0 0 2px rgba(0,0,0,0.8), 0 0 4px rgba(255,255,255,0.05);";
+        
+        if (rendaState === 5) {
+          result += `<span style="color: #ffff00; font-weight: bold; ${textShadow}">${escapedChar}</span>`;
+          if (char === '8') rendaState = 0; 
+        } else if (rendaState === 7) {
+          result += `<span style="color: #ff9100; font-weight: bold; ${textShadow}">${escapedChar}</span>`;
+          if (char === '8') rendaState = 0; 
+        } else {
+          if (char === '5' || char === '6') {
+            rendaState = 5;
+            result += `<span style="color: #ffff00; font-weight: bold; ${textShadow}">${escapedChar}</span>`;
+          } else if (char === '7') {
+            rendaState = 7;
+            result += `<span style="color: #ff9100; font-weight: bold; ${textShadow}">${escapedChar}</span>`;
+          } else if (char === '1' || char === '3') {
+            result += `<span style="color: #ff3333; font-weight: bold; ${textShadow}">${escapedChar}</span>`; 
+          } else if (char === '2' || char === '4') {
+            result += `<span style="color: #33ebff; font-weight: bold; ${textShadow}">${escapedChar}</span>`; 
+          } else if (char === '0' && inActiveChart) {
+            // 【仕様維持】#STARTから#END区間の休符(0)をグレーに
+            result += `<span style="color: #6e7681;">${escapedChar}</span>`;
+          } else {
+            result += escapedChar;
+          }
+        }
+      }
+      lineHtml = result;
+    }
+    
+    const finalHtml = lineHtml === "" ? "&#8203;" : lineHtml;
+    return `<div class="highlight-row" style="width:100%; word-break:break-all;">${finalHtml}</div>`;
+  });
+  
+  return highlightedLines.join('');
+}
+
 const textarea = u('.input').first();
 const backdrop = u('.backdrop').first();
 const highlightDiv = u('.highlight').first();
@@ -1852,7 +1925,7 @@ function updateLineNumbers(text) {
   debouncedSyncLineHeights();
 }
 
-// 【要件4】ズレを直した縦画面用のレイアウト同期＆バッチ処理設計
+// 【要件2: 修正】ズレを直した縦画面用のレイアウト同期＆バッチ処理設計
 function syncLineHeights() {
   const container = u('.editor-container').first();
   if (!container) return;
@@ -2079,28 +2152,12 @@ u('.controls-page .button[data-value]').on('click', e => {
   updateUI(); 
 });
 
-// 【要件2: 修正】非同期ダブルチェック機構付きフォーカス制御
+// 集中モード
 u('.input').on('focus', () => {
     u('body').addClass('focus-mode');
 });
 u('.input').on('blur', () => {
-    setTimeout(() => {
-        // 安全猶予を設けて本当にフォーカスがエディタから外れた時のみクラスを除去
-        if (document.activeElement !== u('.input').first()) {
-            u('body').removeClass('focus-mode');
-        }
-    }, 150);
-});
-
-// 【要件2: 修正】エディタ外部領域（ヘッダー・フッター・再生ボタン等）のタップを検知して確実に通常UIに戻すグローバルクローン
-u(document).on('pointerdown', (e) => {
-    if (!u(e.target).closest('.area-editor').length) {
-        const active = document.activeElement;
-        if (active && active.tagName === 'TEXTAREA') {
-            active.blur();
-        }
-        u('body').removeClass('focus-mode');
-    }
+    u('body').removeClass('focus-mode');
 });
 
 function createSynthesizedAudioBuffer(ctx, type) {
@@ -2197,9 +2254,6 @@ function updateChartState(timeSec) {
             case 'BPMCHANGE':
                 state_currentBPM = cmd.value;
                 break;
-            case 'MEASURE':
-                state_currentBeat = cmd.value; // 【要件2】現在の拍子をリアルタイム追従
-                break;
             case 'GOGOSTART':
                 if (!state_isGogo) {
                     lastGogoStartTime = cmd.time;
@@ -2218,7 +2272,6 @@ function updateChartState(timeSec) {
 function seekChartState(timeSec) {
     state_commandIndex = 0;
     state_currentBPM = tjaParsed ? (tjaParsed.headers.bpm || 120) : 120;
-    state_currentBeat = "4/4"; // 【要件2】拍子の初期化
     state_isGogo = false;
     state_jposStartTime = -Infinity;
     state_jposDuration = 0;
@@ -2240,9 +2293,6 @@ function seekChartState(timeSec) {
         switch (cmd.type) {
             case 'BPMCHANGE':
                 state_currentBPM = cmd.value;
-                break;
-            case 'MEASURE':
-                state_currentBeat = cmd.value;
                 break;
             case 'GOGOSTART':
                 lastGogoStartTime = cmd.time;
@@ -2321,7 +2371,7 @@ function drawJiroBalloonNote(ctx, rx, ry, note) {
     ctx.restore();
 }
 
-// 【要件4＆要件1: 修正】描画順を「奥（背面）: ゴーゴー背景 ➔ レーン ➔ 判定枠・オーラ ➔ ノーツ（最前面）」に完全統一！
+// 【要件1＆3: 完全修正】描画レイヤー順「ゴーゴー背景 ➔ レーン ➔ 判定枠・オーラ ➔ ノーツ（最前面）」
 function updateJiroPreview(time = currentElapsedTime) {
     if (!jiroCanvas || !jiroCtx) {
         jiroCanvas = document.getElementById('jiro-previewCanvas');
@@ -2338,12 +2388,11 @@ function updateJiroPreview(time = currentElapsedTime) {
     }
     
     const dpr = window.devicePixelRatio || 1;
-    
     const container = document.getElementById('jiro-preview-container');
     const rectWidth = container.clientWidth > 0 ? container.clientWidth : 946;
     const rectHeight = container.clientHeight > 0 ? container.clientHeight : 150; 
     
-    // 【軽量化・ガタつき完全防止】Canvasサイズ代入を「実際に変更があったときのみ」に限定して初期化ノイズを排除
+    // 【軽量化】サイズ変更時のみCanvasバッファサイズを設定してガタつきを完全に防止
     if (jiroCanvas.width !== rectWidth * dpr || jiroCanvas.height !== rectHeight * dpr) {
         jiroCanvas.width = rectWidth * dpr;
         jiroCanvas.height = rectHeight * dpr;
@@ -2357,7 +2406,7 @@ function updateJiroPreview(time = currentElapsedTime) {
     const canvasMargin = 100;
 
     // ----------------------------------------------------
-    // レイヤー 1: 背景およびレーンベースラインの描画（定位置完全固定・最背面）
+    // レイヤー 1: レーンの背景・ゴーゴー背景の描画（定位置に完全固定・最背面）
     // ----------------------------------------------------
     jiroCtx.clearRect(0, 0, rectWidth, rectHeight);
     
@@ -2368,7 +2417,7 @@ function updateJiroPreview(time = currentElapsedTime) {
     jiroCtx.fillStyle = '#1b1b22';
     jiroCtx.fillRect(110, laneTop, rectWidth - 110, laneHeight);
 
-    // ゴーゴー背景色の描画
+    // ゴーゴー背景色の描画（色の濃さをほんの少し濃く維持）
     if (state_isGogo) {
         const grad = jiroCtx.createLinearGradient(110, 0, rectWidth, 0);
         grad.addColorStop(0, 'rgba(255, 69, 0, 0.45)');
@@ -2455,7 +2504,7 @@ function updateJiroPreview(time = currentElapsedTime) {
         jiroCtx.restore();
     }
 
-    // 判定枠の白ライン
+    // 判定枠の本体白サークル
     jiroCtx.beginPath();
     jiroCtx.arc(HIT_POSITION_X, baseCenterY, radiusNormal, 0, Math.PI * 2); 
     jiroCtx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
@@ -2753,7 +2802,7 @@ async function startSimulation() {
     simulationStartOffset = currentElapsedTime;
     simulationStartTime = audioContext ? audioContext.currentTime : 0; 
     
-    // タイマー競合バグを排除するため、描画用とロジックフォールバック用タイムスタンプを個別にリセット
+    // 【要件1: 修正】タイマー競合バグを排除するため、描画用とロジックフォールバック用タイムスタンプを個別にリセット
     lastFrameTime = performance.now(); 
     lastLogicTime = performance.now(); 
 
@@ -2867,19 +2916,14 @@ function playSE(type) {
 
 function updateComboDisplay() {}
 
-// 【要件2】現在のBPM、現在の拍子(MEASURE)をフローティングバッジへリアルタイムに同期表示
 function updateMeasureDisplay() {
     if (!currentChartData || !currentChartData.allMeasureTimes) {
-        u('#jiro-display-measure').text('小節: 0 / 0');
-        u('#jiro-display-bpm').text('BPM: ---');
-        u('#jiro-display-beat').text('拍子: -/-');
+        u('#jiro-measure-display').text('');
         return;
     }
     const currentMeasure = currentMeasureIndex + 1; 
     const totalMeasures = currentChartData.allMeasureTimes.length;
-    u('#jiro-display-measure').text(`小節: ${currentMeasure} / ${totalMeasures}`);
-    u('#jiro-display-bpm').text(`BPM: ${formatBpm(state_currentBPM)}`);
-    u('#jiro-display-beat').text(`拍子: ${state_currentBeat}`);
+    u('#jiro-measure-display').text(`小節: ${currentMeasure} / ${totalMeasures}`);
 }
 
 function autoHitCheck(elapsedTime) {
@@ -2984,7 +3028,7 @@ function updateLogic() {
     if (audioContext && audioContext.state === 'running' && isPlaying) {
         currentElapsedTime = simulationStartOffset + (audioContext.currentTime - simulationStartTime) * playbackSpeed;
     } else if (isPlaying) {
-        // AudioContextが非アクティブな時間や、制限下でもタイマーを物理時間経過差分で前進させデッドロックを回避！
+        // 【要件1: 修正】FPS制限タイマーと完全に独立させた、ロジック経過時間専用フォールバックでフリーズを完全防止！
         const delta = (now - lastLogicTime) / 1000.0;
         currentElapsedTime += delta * playbackSpeed;
     }
@@ -3048,7 +3092,7 @@ function drawLoop(timestamp) {
     animationFrameId = requestAnimationFrame(drawLoop);
     const elapsed = timestamp - lastFrameTime;
     if (elapsed < 1000 / renderFPS) return;
-    lastFrameTime = timestamp - (elapsed % (1000 / renderFPS)); // ロジックに影響を与えない完全に独立した描画間隔制御
+    lastFrameTime = timestamp - (elapsed % (1000 / renderFPS)); // 【要件1: 修正】ロジックに影響を与えない完全に独立した描画間隔制御
     
     updateJiroPreview(currentElapsedTime);
 }
@@ -3181,7 +3225,7 @@ window.addEventListener('keyup', (e) => {
     }
 });
 
-// 画面・タブ切り替え（バックグラウンド移行＆復帰）時のラグキャリブレーション付き復帰イベントリスナー
+// 【要件4】画面・タブ切り替え（バックグラウンド移行＆復帰）時のラグキャリブレーション付き復帰イベントリスナー
 document.addEventListener('visibilitychange', async () => {
     if (document.hidden) {
         // バックグラウンド移行時：即座に一時停止し、オーディオスレッド・タイマースレッドを完全にクリーンアップして初期化
@@ -3241,7 +3285,6 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     await initDB();
 
-    // エディタ内容の復元
     const saved = localStorage.getItem('tja_tools_autosave');
     if (saved) {
         u('.input').first().value = saved;
