@@ -693,7 +693,7 @@ function convertMCtoTJA(mcContent) {
     });
     
     metaEvents.forEach(t => { 
-        if (t.bpm === undefined && t.sign !== undefined) return;
+        if (t.bpm === undefined && t.sign === undefined) return; 
         const tb = t.adjustedBeat; 
         if (tb < 0) return; 
         const bar = getBarInfo(tb);
@@ -3266,7 +3266,7 @@ document.addEventListener('visibilitychange', async () => {
 
 window.addEventListener('focus', async () => {
     if (audioContext && audioContext.state === 'suspended') {
-        try { await audioContext.resume(); } catch(e) {}
+        try { await audioContext.resume(); } catch(e){}
     }
     updateJiroPreview(currentElapsedTime);
 });
