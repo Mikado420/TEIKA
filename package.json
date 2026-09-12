@@ -1,0 +1,14 @@
+{
+  "name": "tja-tools",
+  "version": "1.0.0",
+  "description": "TJA Tools",
+  "main": "server.js",
+  "scripts": {
+    "dev": "node server.js",
+    "build": "mkdir -p dist && cp -r index.html Sounds dist/",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
