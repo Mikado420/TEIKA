@@ -1,0 +1,131 @@
+    /* エディタとハイライトの重ね合わせ */
+    .area-editor { flex: 1; display: flex; flex-direction: column; padding: 6px; overscroll-behavior: contain; position: relative; }
+    .editor-container { 
+      flex: 1; 
+      width: 100%; 
+      position: relative; 
+      overflow: hidden; 
+      border: 1px solid #282830; 
+      background: #1b1b22; 
+      border-radius: 6px; 
+      display: flex; 
+      box-shadow: inset 0 2px 8px rgba(0,0,0,0.3);
+    }
+    
+    /* 2. 【行番号エリアのズレ修正】幅を 42px に縮小 */
+    .editor-container .line-numbers {
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 42px; 
+      background: #141418;
+      border-right: 1px solid #282830;
+      padding: 8px 0; /* 上下の余白をテキストパディングと完全一致 */
+      overflow: hidden;
+      user-select: none;
+      box-sizing: border-box;
+      color: #555562;
+    }
+    /* 自動改行・折り返し時の行ズレバグ解消 */
+    .line-number-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      padding: 0 4px;
+      width: 100%;
+      box-sizing: border-box;
+      height: 18px;
+      overflow: hidden;
+    }
+    
+    /* 2. 【自動改行ズレ修正】自動折り返しをpre指定により強制排除し物理ズレを完全根絶！ */
+    .editor-container .backdrop {
+      position: absolute;
+      left: 42px; right: 0; top: 0; bottom: 0;
+      padding: 8px 10px;
+      margin: 0;
+      border: none !important;
+      box-sizing: border-box;
+      pointer-events: none;
+      overflow-y: scroll;
+      background-color: #1b1b22;
+      color: #e3e3e6;
+    }
+    .editor-container .backdrop, .area-editor .input, .editor-container .line-numbers {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+      font-size: 12px !important;
+      line-height: 18px !important;
+      letter-spacing: normal !important;
+      word-spacing: normal !important;
+      white-space: pre !important; /* 横スクロール仕様に統一し、行の折り返しによる縦方向の累積ズレを物理的に抹消 */
+      word-wrap: normal !important; 
+      word-break: keep-all !important;
+    }
+    .editor-container .highlight {
+      margin: 0;
+      padding: 0;
+    }
+    .highlight-row {
+      min-height: 18px;
+      box-sizing: border-box;
+    }
+    .area-editor .input {
+      position: absolute;
+      left: 42px; right: 0; top: 0; bottom: 0;
+      width: calc(100% - 42px);
+      height: 100%;
+      resize: none;
+      padding: 8px 10px;
+      border: none !important;
+      outline: none;
+      overscroll-behavior: contain;
+      background: transparent !important;
+      color: transparent !important;
+      caret-color: #58a6ff;
+      overflow-y: scroll;
+      box-sizing: border-box;
+    }
+    .area-editor .input:placeholder-shown {
+      color: #555562 !important;
+    }
+
+    /* エディタ用の譜面画像 Canvas */
+    .page-editor canvas { 
+      background: #b0b0b5; 
+      box-shadow: 0 10px 25px rgba(0,0,0,0.4); 
+      border-radius: 6px;
+      width: 100% !important; 
+      height: auto !important; 
+      display: block; 
+      margin: 0 auto; 
+      image-rendering: pixelated; 
+    }
+    
+    /* グラデーションパネル内のスタイル調整 */
+    .page-gradation, .page-gradation div, .page-gradation strong { color: #e3e3e6 !important; }
+    .page-gradation strong { color: #ffffff !important; }
+    .page-gradation code { 
+      background: #23232d !important; 
+      color: #ff79c6 !important; 
+      border: 1px solid #333344 !important; 
+      padding: 2px 6px; 
+      border-radius: 4px; 
+      font-family: monospace;
+      font-size: 11px;
+    }
+    #grad-list { color: #8c8c9e !important; border-top: none !important; }
+    .page-gradation div[style*="border-top"] { border-top-color: #2c2c35 !important; }
+
+    /* 2. 【要件2】スマートフォン縦画面専用のCSS設計 (自動折り返しを強制無効化) */
+    @media (max-width: 768px) {
+      .editor-container .backdrop, .area-editor .input, .editor-container .line-numbers {
+        font-size: 11px !important;
+        line-height: 16px !important; /* 縦幅ズレを防ぐためフォントサイズ＆行高さを詰めて完璧に統一 */
+        white-space: pre !important; /* モバイルも折り返しを強制排除 */
+      }
+      .line-number-row {
+        height: 16px !important;
+      }
+      .highlight-row {
+        min-height: 16px !important;
+      }
+    }
