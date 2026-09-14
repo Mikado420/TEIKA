@@ -105,6 +105,11 @@ const handleResize = () => {
     syncScroll();
     updateHighlight();
   });
+  setTimeout(() => {
+    syncLineHeights();
+    syncScroll();
+    updateHighlight();
+  }, 100);
 };
 window.addEventListener('resize', handleResize);
 window.addEventListener('orientationchange', handleResize);
@@ -244,6 +249,11 @@ u('#btn-toggle-image').on('click', () => {
   state.isChartImageVisible = !state.isChartImageVisible;
   localStorage.setItem('teika_chart_image_visible', state.isChartImageVisible);
   updateUI();
+  requestAnimationFrame(() => {
+    syncLineHeights();
+    syncScroll();
+    updateHighlight();
+  });
 });
 
 u('#zoom-in').on('click', e => {

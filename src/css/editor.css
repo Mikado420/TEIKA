@@ -37,20 +37,25 @@
       overflow: hidden;
     }
     
-    /* 2. 【自動改行ズレ修正】自動折り返しをpre指定により強制排除し物理ズレを完全根絶！ */
+    /* 2. 【自動改行ズレ修正】自動折り返しをpre指定により強制排除し物理ズレを完全根脱！ */
     .editor-container .backdrop {
       position: absolute;
       left: 42px; right: 0; top: 0; bottom: 0;
-      padding: 8px 10px;
+      width: calc(100% - 42px);
+      height: 100%;
+      padding: 8px 10px !important;
       margin: 0;
       border: none !important;
-      box-sizing: border-box;
+      box-sizing: border-box !important;
       pointer-events: none;
+      overflow-x: auto;
       overflow-y: scroll;
       background-color: #1b1b22;
       color: #e3e3e6;
+      -webkit-text-size-adjust: 100% !important;
+      text-size-adjust: 100% !important;
     }
-    .editor-container .backdrop, .area-editor .input, .editor-container .line-numbers {
+    .editor-container .backdrop, .area-editor .input, .editor-container .line-numbers, .editor-container .highlight, .highlight-row, .highlight-row span {
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
       font-size: 12px !important;
       font-weight: bold !important;
@@ -60,11 +65,14 @@
       white-space: pre !important;
       word-wrap: normal !important; 
       word-break: normal !important;
+      overflow-wrap: normal !important;
       text-indent: 0 !important;
       tab-size: 4 !important;
       box-sizing: border-box !important;
       text-rendering: auto !important;
       font-kerning: none !important;
+      -webkit-text-size-adjust: 100% !important;
+      text-size-adjust: 100% !important;
     }
     .area-editor .input, .editor-container .backdrop {
       padding: 8px 10px !important;
@@ -73,10 +81,14 @@
     .editor-container .highlight {
       margin: 0;
       padding: 0;
+      -webkit-text-size-adjust: 100% !important;
+      text-size-adjust: 100% !important;
     }
     .highlight-row {
       min-height: 18px;
       box-sizing: border-box;
+      -webkit-text-size-adjust: 100% !important;
+      text-size-adjust: 100% !important;
     }
     .area-editor .input {
       position: absolute;
@@ -84,15 +96,19 @@
       width: calc(100% - 42px);
       height: 100%;
       resize: none;
-      padding: 8px 10px;
+      padding: 8px 10px !important;
+      margin: 0;
       border: none !important;
       outline: none;
       overscroll-behavior: contain;
       background: transparent !important;
       color: transparent !important;
       caret-color: #58a6ff;
+      overflow-x: auto;
       overflow-y: scroll;
-      box-sizing: border-box;
+      box-sizing: border-box !important;
+      -webkit-text-size-adjust: 100% !important;
+      text-size-adjust: 100% !important;
     }
     .area-editor .input:placeholder-shown {
       color: #555562 !important;
@@ -127,18 +143,28 @@
 
     /* 2. 【要件2】スマートフォン縦画面専用のCSS設計 (自動折り返しを強制無効化) */
     @media (max-width: 768px) {
-      .editor-container .backdrop, .area-editor .input, .editor-container .line-numbers {
+      .editor-container .backdrop, .area-editor .input, .editor-container .line-numbers, .editor-container .highlight, .highlight-row, .highlight-row span {
         font-size: 11px !important;
         line-height: 16px !important; 
         white-space: pre !important; 
         word-wrap: normal !important;
         word-break: normal !important;
+        overflow-wrap: normal !important;
         font-weight: bold !important;
+        -webkit-text-size-adjust: 100% !important;
+        text-size-adjust: 100% !important;
       }
       .line-number-row {
         height: 16px !important;
       }
       .highlight-row {
         min-height: 16px !important;
+      }
+    }
+
+    /* スマートフォン横画面時のエディタ領域最大化 */
+    @media (max-height: 500px) and (max-width: 1024px) {
+      .area-editor {
+        padding: 4px !important;
       }
     }
