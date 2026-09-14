@@ -198,7 +198,13 @@ export function convertMCtoTJA(mcContent) {
   return tja;
 }
 
-export function parseTJA(tja) {
+export function parseTJA(tja, startTime = 0) {
+  let loopCounter = 0;
+  function checkTimeout() {
+    if (loopCounter++ % 100 === 0 && startTime > 0 && performance.now() - startTime > 1000) {
+      throw new Error('HEAVY_CHART_ABORT');
+    }
+  }
   const lines = tja.split(/\r?\n/).map(l => l.trim());
   const headers = {
     title: '',
@@ -212,6 +218,7 @@ export function parseTJA(tja) {
     eventBuf = [],
     currentMeasure = [4, 4];
   for (let line of lines) {
+    checkTimeout();
     const raw = line.split('//')[0].trim();
     if (!raw) continue;
     if (raw.startsWith('TITLE:')) headers.title = raw.substring(6).trim();else if (raw.startsWith('SUBTITLE:')) headers.subtitle = raw.substring(9).trim().replace(/^--\s*/, '').replace(/^[+-]/, '');else if (raw.startsWith('BPM:')) headers.bpm = parseFloat(raw.substring(4)) || 120;else if (raw.startsWith('WAVE:')) headers.wave = raw.substring(5).trim();else if (raw.startsWith('OFFSET:')) headers.offset = parseFloat(raw.substring(7)) || 0;else if (raw.startsWith('COURSE:')) {
@@ -244,6 +251,7 @@ export function parseTJA(tja) {
         });
       } else if (raw.match(/^[0-9A-G,]*$/)) {
         for (let char of raw) {
+    checkTimeout();
           if (char === ',') {
             currentCourse.measures.push({
               length: [...currentMeasure],
@@ -266,7 +274,13 @@ export function parseTJA(tja) {
 // プレビュー用に元のTJAエディターから完全移植した高精度パース
 
 // プレビュー用に元のTJAエディターから完全移植した高精度パース
-export function parseTJAForPreview(text) {
+export function parseTJAForPreview(text, startTime = 0) {
+  let loopCounter = 0;
+  function checkTimeout() {
+    if (loopCounter++ % 100 === 0 && startTime > 0 && performance.now() - startTime > 1000) {
+      throw new Error('HEAVY_CHART_ABORT');
+    }
+  }
   const lines = text.split('\n').map(line => {
     const commentIndex = line.indexOf('//');
     return commentIndex !== -1 ? line.substring(0, commentIndex).trim() : line.trim();
@@ -488,7 +502,9 @@ export function parseTJAForPreview(text) {
       beatsPerNote = noteCountInMeasure > 0 ? measureDurationInBeats / noteCountInMeasure : 0;
     let commandIndex = 0;
     for (let j = 0; j < noteChars.length; j++) {
+    checkTimeout();
       while (commandIndex < commandsInMeasure.length && commandsInMeasure[commandIndex].noteIndex === j) {
+    checkTimeout();
         parseCommand(commandsInMeasure[commandIndex].commandStr);
         commandIndex++;
       }
@@ -562,6 +578,7 @@ export function parseTJAForPreview(text) {
       }
     }
     while (commandIndex < commandsInMeasure.length) {
+    checkTimeout();
       parseCommand(commandIndex);
       commandIndex++;
     }
@@ -570,6 +587,7 @@ export function parseTJAForPreview(text) {
     measureNotesStr = "",
     measureCommands = [];
   for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+    checkTimeout();
     const line = lines[lineIndex];
     if (line.length === 0) continue;
     if (!parsingNotes) {
@@ -624,10 +642,12 @@ export function parseTJAForPreview(text) {
       } else {
         let i = 0;
         while (i < line.length) {
+    checkTimeout();
           const char = line[i];
           if (char === '#') {
             let commandEnd = i + 1;
             while (commandEnd < line.length && line[commandEnd] !== '#' && line[commandEnd] !== ',') {
+    checkTimeout();
               commandEnd++;
             }
             const commandStr = line.substring(i, commandEnd);
@@ -653,6 +673,7 @@ export function parseTJAForPreview(text) {
     }
   }
   for (const key in courses) {
+    checkTimeout();
     const chart = courses[key];
     chart.notes.sort((a, b) => a.time - b.time);
     if (chart.barlineTimes.length > 0) {
@@ -674,5 +695,70 @@ export function parseTJAForPreview(text) {
   return {
     globalConfig,
     courses
+  };
+}export function scanTJAInfo(tja) {
+  const lines = tja.split(/\r?\n/);
+  let charCount = tja.length;
+  let lineCount = lines.length;
+  let measureCount = 0;
+  let notesCount = 0;
+  
+  let currentBpm = 120;
+  let currentMeasure = [4, 4];
+  let duration = 0; // seconds
+  let hasValidDuration = true;
+
+  for (let i = 0; i < lines.length; i++) {
+    const raw = lines[i].split('//')[0].trim();
+    if (!raw) continue;
+    
+    if (raw.startsWith('BPM:')) {
+      const val = parseFloat(raw.substring(4));
+      if (!isNaN(val) && val > 0) currentBpm = val;
+    } else if (raw.startsWith('#BPMCHANGE')) {
+      const val = parseFloat(raw.substring(10).trim());
+      if (!isNaN(val) && val > 0) currentBpm = val;
+    } else if (raw.startsWith('#MEASURE')) {
+      const m = raw.substring(8).trim().split('/');
+      if (m.length === 2) {
+        const num = parseFloat(m[0]);
+        const den = parseFloat(m[1]);
+        if (!isNaN(num) && !isNaN(den) && den !== 0 && num >= 0 && den > 0) {
+          currentMeasure = [num, den];
+        } else {
+          hasValidDuration = false;
+        }
+      }
+    } else if (raw === ',') {
+      measureCount++;
+      const beats = (currentMeasure[0] / currentMeasure[1]) * 4;
+      if (!isNaN(beats) && isFinite(beats) && beats >= 0 && currentBpm > 0) {
+        duration += (beats / currentBpm) * 60;
+      } else {
+        hasValidDuration = false;
+      }
+    } else if (raw.match(/^[0-9A-G,]+$/)) {
+      for (let char of raw) {
+        if (char === ',') {
+          measureCount++;
+          const beats = (currentMeasure[0] / currentMeasure[1]) * 4;
+          if (!isNaN(beats) && isFinite(beats) && beats >= 0 && currentBpm > 0) {
+            duration += (beats / currentBpm) * 60;
+          } else {
+            hasValidDuration = false;
+          }
+        } else if (['1', '2', '3', '4'].includes(char)) {
+           notesCount++;
+        }
+      }
+    }
+  }
+
+  return {
+    charCount,
+    lineCount,
+    measureCount,
+    notesCount,
+    duration: hasValidDuration ? duration : null
   };
 }

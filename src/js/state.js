@@ -1,4 +1,6 @@
 export const state = {
+  isLightweightMode: false,
+  heavyChartRaw: null,
   tjaParsed: null,
   selectedDifficulty: '',
   selectedPage: 'editor',

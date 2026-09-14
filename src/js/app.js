@@ -1,6 +1,6 @@
 import { formatBpm, loadFileWithEncoding } from './utils.js';
 import { state, initDB, saveData, loadData } from './state.js';
-import { parseTJA, convertMCtoTJA, parseTJAForPreview } from './tja-parser.js';
+import { parseTJA, convertMCtoTJA, parseTJAForPreview, scanTJAInfo } from './tja-parser.js';
 import { textarea, updateLineNumbers, syncLineHeights, debouncedSyncLineHeights, syncScroll, updateHighlight, replaceGradation } from './editor.js';
 import { drawChart, getStats, drawDensityGraph } from './statistics.js';
 import { findMeasureIndex, initializeAudio, updateChartState, seekChartState, drawJiroPremiumNote, drawJiroBalloonNote, updateJiroPreview, setChartTime, startSimulation, stopSimulation, togglePlay, resetSimulation, seekToMeasure, playSE, updateComboDisplay, updateMeasureDisplay, autoHitCheck, updateLogic, updateJiroUIElements, drawLoop } from './preview.js';
@@ -121,16 +121,48 @@ window.addEventListener('orientationchange', handleResize);
 
 textarea.addEventListener('scroll', syncScroll);
 
-export const processFunc = () => {
-  const val = u('.input').first().value;
-  updateHighlight();
-  if (!val) return;
-  if (state.debounceTimer) clearTimeout(state.debounceTimer);
-  state.debounceTimer = setTimeout(() => {
+
+function showHeavyChartPopup(val, isStartup) {
+  const info = scanTJAInfo(val);
+  u('#heavy-info-chars').text(info.charCount.toLocaleString());
+  u('#heavy-info-lines').text(info.lineCount.toLocaleString());
+  u('#heavy-info-duration').text(info.duration !== null ? info.duration.toFixed(2) + " 秒" : "算出不能");
+  u('#heavy-info-measures').text(info.measureCount.toLocaleString());
+  u('#heavy-info-notes').text(info.notesCount.toLocaleString());
+
+  if (isStartup) {
+    u('#heavy-chart-title').text("自動保存された大きな譜面が見つかりました");
+    u('#heavy-chart-desc').text("起動時の自動解析を一時停止しました。復元方法を選択してください。");
+    u('#btn-heavy-normal').text("通常モードで復元");
+    u('#btn-heavy-light').text("軽量モードで復元");
+    u('#btn-heavy-delete').removeClass('is-hidden');
+  } else {
+    u('#heavy-chart-title').text("大きな譜面を検出しました");
+    u('#heavy-chart-desc').text("読み込み処理に1000ms以上かかったため、処理を一時停止しました。");
+    u('#btn-heavy-normal').text("通常モードで読み込む");
+    u('#btn-heavy-light').text("軽量モードで読み込む");
+    u('#btn-heavy-delete').addClass('is-hidden');
+  }
+
+  u('#heavy-chart-modal').addClass('is-visible');
+}
+
+u('#btn-heavy-normal').on('click', () => {
+  u('#heavy-chart-modal').removeClass('is-visible');
+  state.isLightweightMode = false;
+  u('#lightweight-banner').addClass('is-hidden');
+  
+  
+  if (state.heavyChartRaw) {
+    // 警告なしで通常モード強制実行
+    const val = state.heavyChartRaw;
+    state.heavyChartRaw = null;
+    
+    // 強制的にparseTJAを呼ぶ (timeoutなし = startTime=0)
     try {
-      state.tjaParsed = parseTJA(val);
+      state.tjaParsed = parseTJA(val, 0);
       if (!state.selectedDifficulty || !state.tjaParsed.courses[state.selectedDifficulty]) state.selectedDifficulty = Object.keys(state.tjaParsed.courses)[0];
-      const parsedForPreview = parseTJAForPreview(val);
+      const parsedForPreview = parseTJAForPreview(val, 0);
       state.currentChartData = parsedForPreview.courses[state.selectedDifficulty] || null;
       if (state.currentChartData) {
         state.tjaParsed.headers.offset = parsedForPreview.globalConfig.OFFSET;
@@ -144,8 +176,77 @@ export const processFunc = () => {
         state.errorLineNumber = null;
         updateHighlight();
       }
-      localStorage.setItem('tja_tools_autosave', val);
+    } catch(e) {
+      u('.errors').text(e.message);
+      u('.area-errors').removeClass('is-success');
+    }
+  }
+});
+
+u('#btn-heavy-light').on('click', () => {
+  u('#heavy-chart-modal').removeClass('is-visible');
+  state.isLightweightMode = true;
+  state.heavyChartRaw = null;
+  u('#lightweight-banner').removeClass('is-hidden');
+  
+});
+
+u('#btn-force-parse').on('click', () => {
+  // 軽量モードのバナーから手動で通常解析
+  state.isLightweightMode = false;
+  u('#lightweight-banner').addClass('is-hidden');
+  
+  processFunc(true); // 強制解析
+});
+
+u('#btn-heavy-delete').on('click', () => {
+  localStorage.removeItem('tja_tools_autosave');
+  u('#heavy-chart-modal').removeClass('is-visible');
+  u('.input').first().value = '';
+  state.isLightweightMode = false;
+  state.heavyChartRaw = null;
+});
+
+
+export const processFunc = (forceNormal = false, isStartup = false) => {
+  const val = u('.input').first().value;
+  updateHighlight();
+  if (!val) return;
+  if (state.debounceTimer) clearTimeout(state.debounceTimer);
+  state.debounceTimer = setTimeout(() => {
+    localStorage.setItem('tja_tools_autosave', val);
+
+    if (state.isLightweightMode && !forceNormal) {
+      return;
+    }
+
+    try {
+      const startTime = forceNormal ? 0 : performance.now();
+      state.tjaParsed = parseTJA(val, startTime);
+      if (!state.selectedDifficulty || !state.tjaParsed.courses[state.selectedDifficulty]) state.selectedDifficulty = Object.keys(state.tjaParsed.courses)[0];
+      const parsedForPreview = parseTJAForPreview(val, startTime);
+      state.currentChartData = parsedForPreview.courses[state.selectedDifficulty] || null;
+      if (state.currentChartData) {
+        state.tjaParsed.headers.offset = parsedForPreview.globalConfig.OFFSET;
+        setChartTime(state.currentElapsedTime);
+      }
+      state.isChartCacheDirty = true;
+      updateUI();
+      u('.errors').text('✓ No error');
+      u('.area-errors').addClass('is-success');
+      if (state.errorLineNumber !== null) {
+        state.errorLineNumber = null;
+        updateHighlight();
+      }
     } catch (e) {
+      if (e.message === 'HEAVY_CHART_ABORT') {
+        state.isLightweightMode = true;
+        state.heavyChartRaw = val;
+        showHeavyChartPopup(val, isStartup);
+        u('#lightweight-banner').removeClass('is-hidden');
+        
+        return;
+      }
       u('.errors').text(e.message);
       u('.area-errors').removeClass('is-success');
       const match = e.message.match(/(?:行|line)\s*([0-9]+)/i);
@@ -304,7 +405,7 @@ u('#btn-grad-replace').on('click', () => {
 
 u('.controls-diff .button[data-value]').on('click', e => {
   state.selectedDifficulty = u(e.target).data('value');
-  state.currentChartData = (parseTJAForPreview(textarea.value) || {courses:{}}).courses[state.selectedDifficulty];
+  state.currentChartData = (parseTJAForPreview, scanTJAInfo(textarea.value) || {courses:{}}).courses[state.selectedDifficulty];
   if (state.currentChartData) {
     seekChartState(0);
     setChartTime(0);
@@ -529,11 +630,26 @@ window.addEventListener('DOMContentLoaded', async () => {
     state.jiroCtx = state.jiroCanvas.getContext('2d');
   }
   await initDB();
+  
+  
+  
   const saved = localStorage.getItem('tja_tools_autosave');
   if (saved) {
     u('.input').first().value = saved;
-    processFunc();
+    // 起動時の軽量事前チェック (文字数10万以上 or 行数5000以上は無条件で巨大判定)
+    const PRE_CHECK_CHARS = 100000;
+    const PRE_CHECK_LINES = 5000;
+    if (saved.length > PRE_CHECK_CHARS || saved.split('\n').length > PRE_CHECK_LINES) {
+      state.isLightweightMode = true;
+      state.heavyChartRaw = saved;
+      showHeavyChartPopup(saved, true);
+      u('#lightweight-banner').removeClass('is-hidden');
+      
+    } else {
+      processFunc(false, true);
+    }
   }
+
   try {
     const musicFile = await loadData('files', 'music');
     if (musicFile && musicFile.data) {
