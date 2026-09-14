@@ -187,7 +187,7 @@ export function saveTJAAutosave(val) {
   }, 150);
 }
 
-function handleHeavyChartAbort(val, isStartup = false) {
+function handleHeavyChartAbort(val, isStartup = false, info = null) {
   // 進行中の画像生成を破棄
   state.chartRenderAbortToken++;
   state.isRenderingChart = false;
@@ -195,11 +195,13 @@ function handleHeavyChartAbort(val, isStartup = false) {
   state.isLightweightMode = true;
   state.heavyChartRaw = val;
   u('#lightweight-banner').removeClass('is-hidden');
-  showHeavyChartPopup(val, isStartup);
+  showHeavyChartPopup(val, isStartup, info);
 }
 
-function showHeavyChartPopup(val, isStartup) {
-  const info = scanTJAInfo(val);
+function showHeavyChartPopup(val, isStartup, info = null) {
+  if (!info) {
+    info = scanTJAInfo(val);
+  }
   u('#heavy-info-chars').text(info.charCount.toLocaleString());
   u('#heavy-info-lines').text(info.lineCount.toLocaleString());
   u('#heavy-info-duration').text(info.duration !== null ? info.duration.toFixed(2) + " 秒" : "算出不能");
@@ -227,6 +229,9 @@ function showHeavyChartPopup(val, isStartup) {
 u('#btn-heavy-normal').on('click', () => {
   u('#heavy-chart-modal').removeClass('is-visible');
   state.isLightweightMode = false;
+  state.heavyChartRaw = null;
+  state.isChartCacheDirty = true;
+  state.cachedChartCanvas = null;
   u('#lightweight-banner').addClass('is-hidden');
   processFunc(true, false);
 });
@@ -238,9 +243,21 @@ u('#btn-heavy-light').on('click', () => {
   u('#lightweight-banner').removeClass('is-hidden');
 });
 
+u('#heavy-chart-modal').on('click', e => {
+  if (e.target && e.target.id === 'heavy-chart-modal') {
+    u('#heavy-chart-modal').removeClass('is-visible');
+    state.isLightweightMode = true;
+    state.heavyChartRaw = null;
+    u('#lightweight-banner').removeClass('is-hidden');
+  }
+});
+
 u('#btn-force-parse').on('click', () => {
   // 軽量モードのバナーから手動で通常モードに戻す
   state.isLightweightMode = false;
+  state.heavyChartRaw = null;
+  state.isChartCacheDirty = true;
+  state.cachedChartCanvas = null;
   u('#lightweight-banner').addClass('is-hidden');
   processFunc(true, false);
 });
@@ -274,6 +291,18 @@ export const processFunc = (forceNormal = false, isStartup = false) => {
     // 軽量モード中は、重い処理（パース・画像・プレビュー・統計）を自動実行しない
     if (state.isLightweightMode && !forceNormal) {
       return;
+    }
+
+    // 【要件2 & 3】描画・大量データ生成を開始する前に Heavy 判定を実行
+    // 通常モードで編集中に巨大な #MEASURE や異常値を検出した場合、
+    // parseTJA / parseTJAForPreview / drawChart まで進んでメインスレッドをブロックする前に
+    // 軽量モードへ安全に退避する
+    if (!forceNormal) {
+      const info = scanTJAInfo(val);
+      if (info.isHeavy) {
+        handleHeavyChartAbort(val, isStartup, info);
+        return;
+      }
     }
 
     try {
@@ -319,7 +348,10 @@ u('.input').on('input', () => {
   const val = u('.input').first().value;
   // 1. 自動保存を解析と完全に独立して即時スケジュール
   saveTJAAutosave(val);
-  // 2. 解析・描画処理（軽量モードならスキップ）
+  // 2. 進行中の画像生成を直ちに中断（要件7: キャンセル機構）
+  state.chartRenderAbortToken++;
+  state.isRenderingChart = false;
+  // 3. 解析・描画処理（軽量モードならスキップ）
   processFunc(false, false);
 });
 
@@ -727,15 +759,9 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     // 2. 高速・安全な事前スキャン (文字数、行数、小節数、ノーツ数、小節長、演奏時間の総合安全チェック)
     const info = scanTJAInfo(saved);
-    const isHeavy = info.charCount > 30000 || 
-                    info.lineCount > 1500 || 
-                    info.measureCount > 400 || 
-                    info.notesCount > 3000 ||
-                    info.maxMeasureBeats > 16 ||
-                    info.duration === null;
-    if (isHeavy) {
+    if (info.isHeavy) {
       // 重い解析・描画を開始する前に直ちにモーダルを表示してユーザーに選択させる
-      handleHeavyChartAbort(saved, true);
+      handleHeavyChartAbort(saved, true, info);
     } else {
       processFunc(false, true);
     }

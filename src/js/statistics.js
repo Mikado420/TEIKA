@@ -576,9 +576,11 @@ export function getStats(chart, courseId, startTime = 0) {
 
   course.measures.forEach(m => {
     checkTimeout();
-    const mb = m.length[0] / m.length[1] * 4;
+    const rawMb = m.length[0] / m.length[1] * 4;
+    const mb = (isFinite(rawMb) && !isNaN(rawMb) && rawMb >= 0) ? rawMb : 4;
     const nis = m.data.length || 1;
-    const duration = 60 / currentBpm * mb;
+    const rawDuration = currentBpm > 0 ? (60 / currentBpm) * mb : 0;
+    const duration = (isFinite(rawDuration) && !isNaN(rawDuration) && rawDuration >= 0 && rawDuration <= 86400 * 365) ? rawDuration : 0;
     for (let i = 0; i < m.data.length; i++) {
       checkTimeout();
       const char = m.data[i];
