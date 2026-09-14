@@ -46,7 +46,7 @@
         <textarea class="input" placeholder="TJA data..."></textarea>
       </div>
     </div>
-    <div class="area-errors"><div class="errors">No error</div></div>
+    <div class="area-errors is-success" id="area-errors"><div class="errors" id="error-text">✓ No error</div></div>
   </section>
   <section class="pane-right">
     <div class="area-pages">
@@ -187,30 +187,37 @@
 </main>
 
 <footer class="area-footer">
-  <!-- 難易度ピルタブグループ -->
-  <div class="button-group controls-diff">
-    <span class="button btn-diff-0 is-hidden" data-value='0'>かんたん</span>
-    <span class="button btn-diff-1 is-hidden" data-value='1'>ふつう</span>
-    <span class="button btn-diff-2 is-hidden" data-value='2'>むずかしい</span>
-    <span class="button btn-diff-3 is-hidden" data-value='3'>おに</span>
-    <span class="button btn-diff-4 is-hidden" data-value='4'>裏おに</span>
+  <div class="footer-row difficulty-row">
+    <span class="row-label">難易度</span>
+    <div class="button-group controls-diff">
+      <span class="button btn-diff-0 is-hidden" data-value='0'>かんたん</span>
+      <span class="button btn-diff-1 is-hidden" data-value='1'>ふつう</span>
+      <span class="button btn-diff-2 is-hidden" data-value='2'>むずかしい</span>
+      <span class="button btn-diff-3 is-hidden" data-value='3'>おに</span>
+      <span class="button btn-diff-4 is-hidden" data-value='4'>裏おに</span>
+    </div>
   </div>
-  
-  <!-- 下部操作ボタン＆ユーティリティ -->
-  <div class="button-group controls-page">
-    <span class="button btn-page-editor is-active" data-value='editor'>エディタ</span>
-    <span class="button btn-page-preview" data-value='preview'>プレビュー</span>
-    <span class="button btn-page-statistics" data-value='statistics'>情報</span>
-    <span class="button btn-page-gradation" data-value='gradation'>グラデ</span>
-    <button class="button" style="background:#23232d; color:#e3e3e6; border:1px solid #3c3c4a;" id="btn-open">読込</button>
-    <button class="button" style="background:#15803d; color:white; border:none;" id="btn-tja-save">TJA</button>
-    <button class="button" style="background:#15803d; color:white; border:none;" id="btn-save">PNG</button>
-    <button class="button is-hidden" style="background:#2563eb; color:white; border:none;" id="btn-pwa-install" title="ホーム画面に追加 / アプリをインストール">アプリ追加</button>
-    <input type="file" id="file-input" class="is-hidden" accept="*/*">
-    <div style="margin-left:auto; display:flex; gap:3px;">
-        <button class="button" id="btn-toggle-image" style="background:#23232d; color:#e3e3e6; border:1px solid #3c3c4a; margin-right: 5px;">譜面画像: ON</button>
-        <button class="button" id="zoom-out" style="width:30px; padding:0;">－</button>
-        <button class="button" id="zoom-in" style="width:30px; padding:0;">＋</button>
+  <div class="footer-row tools-row">
+    <div class="button-group controls-page">
+      <span class="button btn-page-editor is-active" data-value='editor'>エディタ</span>
+      <span class="button btn-page-preview" data-value='preview'>プレビュー</span>
+      <span class="button btn-page-statistics" data-value='statistics'>情報</span>
+      <span class="button btn-page-gradation" data-value='gradation'>グラデ</span>
+    </div>
+    <div class="button-group controls-action">
+      <button class="button" id="btn-open">読込</button>
+      <button class="button" id="btn-tja-save">TJA</button>
+      <button class="button" id="btn-save">PNG</button>
+      <button class="button is-hidden" id="btn-pwa-install" title="ホーム画面に追加 / アプリをインストール">アプリ追加</button>
+      <input type="file" id="file-input" class="is-hidden" accept="*/*">
+    </div>
+    <div class="button-group controls-view">
+      <button class="button" id="btn-toggle-image">🖼 譜面画像 ON</button>
+      <div class="zoom-controls">
+        <button class="button btn-icon" id="zoom-out">－</button>
+        <span id="zoom-label" class="zoom-label">100%</span>
+        <button class="button btn-icon" id="zoom-in">＋</button>
+      </div>
     </div>
   </div>
 </footer>

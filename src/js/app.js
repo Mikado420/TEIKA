@@ -16,9 +16,14 @@ function updateUI() {
   
   // Update toggle button text globally
   if (state.isChartImageVisible) {
-    u('#btn-toggle-image').text('画像: ON');
+    u('#btn-toggle-image').text('🖼 譜面画像 ON');
   } else {
-    u('#btn-toggle-image').text('画像: OFF');
+    u('#btn-toggle-image').text('🖼 譜面画像 OFF');
+  }
+  
+  // Update zoom label
+  if (u('#zoom-label').nodes.length > 0) {
+    u('#zoom-label').text(state.zoomLevel + '%');
   }
 
   // Show toggle button only on editor page
@@ -133,7 +138,8 @@ export const processFunc = () => {
       }
       state.isChartCacheDirty = true;
       updateUI();
-      u('.errors').text('No error');
+      u('.errors').text('✓ No error');
+      u('.area-errors').addClass('is-success');
       if (state.errorLineNumber !== null) {
         state.errorLineNumber = null;
         updateHighlight();
@@ -141,6 +147,7 @@ export const processFunc = () => {
       localStorage.setItem('tja_tools_autosave', val);
     } catch (e) {
       u('.errors').text(e.message);
+      u('.area-errors').removeClass('is-success');
       const match = e.message.match(/(?:行|line)\s*([0-9]+)/i);
       if (match) {
         state.errorLineNumber = parseInt(match[1], 10);
