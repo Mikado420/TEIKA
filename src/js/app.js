@@ -574,7 +574,7 @@ if (installBtn) {
       deferredInstallPrompt = null;
     } else if (isIOS) {
       if (iosGuide) {
-        iosGuide.classList.remove('is-hidden');
+        iosGuide.classList.add('is-visible');
       }
     } else {
       alert('ブラウザのメニューから「ホーム画面に追加」または「アプリをインストール」を選択してください。');
@@ -583,12 +583,13 @@ if (installBtn) {
 }
 
 if (closeIosGuideBtn && iosGuide) {
-  closeIosGuideBtn.addEventListener('click', () => {
-    iosGuide.classList.add('is-hidden');
+  closeIosGuideBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    iosGuide.classList.remove('is-visible');
   });
   iosGuide.addEventListener('click', (e) => {
     if (e.target === iosGuide) {
-      iosGuide.classList.add('is-hidden');
+      iosGuide.classList.remove('is-visible');
     }
   });
 }

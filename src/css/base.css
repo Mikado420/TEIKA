@@ -141,3 +141,34 @@
   /* プロンプトで「画面幅に応じて現在のTEIKAのレイアウトを維持しつつ」とあるので、
      横並びを無理に縦にはしない。ただしボタンは押しやすくする。 */
 }
+
+/* iOS PWA Install Guide Modal */
+.ios-install-guide {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.75);
+  z-index: 9999;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.ios-install-guide.is-visible {
+  display: flex;
+}
+
+.ios-install-guide-content {
+  background: #1f1f26;
+  border: 1px solid #3c3c4a;
+  border-radius: 10px;
+  padding: 18px;
+  max-width: 320px;
+  width: 100%;
+  color: #e3e3e6;
+  text-align: center;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+  position: relative;
+  /* Prevent clicks inside the modal from bubbling up and closing it */
+  pointer-events: auto;
+}
