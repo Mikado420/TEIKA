@@ -199,9 +199,10 @@ export function convertMCtoTJA(mcContent) {
 }
 
 export function parseTJA(tja, startTime = 0) {
+  if (!startTime || startTime <= 0) startTime = performance.now();
   let loopCounter = 0;
   function checkTimeout() {
-    if (loopCounter++ % 100 === 0 && startTime > 0 && performance.now() - startTime > 1000) {
+    if (loopCounter++ % 50 === 0 && performance.now() - startTime > 1000) {
       throw new Error('HEAVY_CHART_ABORT');
     }
   }
@@ -275,9 +276,10 @@ export function parseTJA(tja, startTime = 0) {
 
 // プレビュー用に元のTJAエディターから完全移植した高精度パース
 export function parseTJAForPreview(text, startTime = 0) {
+  if (!startTime || startTime <= 0) startTime = performance.now();
   let loopCounter = 0;
   function checkTimeout() {
-    if (loopCounter++ % 100 === 0 && startTime > 0 && performance.now() - startTime > 1000) {
+    if (loopCounter++ % 50 === 0 && performance.now() - startTime > 1000) {
       throw new Error('HEAVY_CHART_ABORT');
     }
   }
@@ -697,11 +699,23 @@ export function parseTJAForPreview(text, startTime = 0) {
     courses
   };
 }export function scanTJAInfo(tja) {
+  if (!tja) {
+    return {
+      charCount: 0,
+      lineCount: 0,
+      measureCount: 0,
+      notesCount: 0,
+      duration: null,
+      maxMeasureBeats: 4
+    };
+  }
+  const scanStart = performance.now();
+  const charCount = tja.length;
   const lines = tja.split(/\r?\n/);
-  let charCount = tja.length;
-  let lineCount = lines.length;
+  const lineCount = lines.length;
   let measureCount = 0;
   let notesCount = 0;
+  let maxMeasureBeats = 4;
   
   let currentBpm = 120;
   let currentMeasure = [4, 4];
@@ -709,6 +723,12 @@ export function parseTJAForPreview(text, startTime = 0) {
   let hasValidDuration = true;
 
   for (let i = 0; i < lines.length; i++) {
+    // タイムアウト保護: 100ms 超過で即打ち切り（ポップアップ情報取得自体で絶対に固まらない）
+    if (i % 200 === 0 && performance.now() - scanStart > 100) {
+      hasValidDuration = false;
+      break;
+    }
+
     const raw = lines[i].split('//')[0].trim();
     if (!raw) continue;
     
@@ -725,40 +745,55 @@ export function parseTJAForPreview(text, startTime = 0) {
         const den = parseFloat(m[1]);
         if (!isNaN(num) && !isNaN(den) && den !== 0 && num >= 0 && den > 0) {
           currentMeasure = [num, den];
+          const beats = (num / den) * 4;
+          if (beats > maxMeasureBeats) {
+            maxMeasureBeats = beats;
+          }
+          if (beats > 64 || !isFinite(beats)) {
+            hasValidDuration = false;
+          }
         } else {
           hasValidDuration = false;
         }
       }
     } else if (raw === ',') {
       measureCount++;
-      const beats = (currentMeasure[0] / currentMeasure[1]) * 4;
-      if (!isNaN(beats) && isFinite(beats) && beats >= 0 && currentBpm > 0) {
-        duration += (beats / currentBpm) * 60;
-      } else {
-        hasValidDuration = false;
+      if (hasValidDuration) {
+        const beats = (currentMeasure[0] / currentMeasure[1]) * 4;
+        if (!isNaN(beats) && isFinite(beats) && beats >= 0 && currentBpm > 0 && beats <= 64) {
+          duration += (beats / currentBpm) * 60;
+        } else {
+          hasValidDuration = false;
+        }
       }
     } else if (raw.match(/^[0-9A-G,]+$/)) {
-      for (let char of raw) {
+      for (let j = 0; j < raw.length; j++) {
+        const char = raw[j];
         if (char === ',') {
           measureCount++;
-          const beats = (currentMeasure[0] / currentMeasure[1]) * 4;
-          if (!isNaN(beats) && isFinite(beats) && beats >= 0 && currentBpm > 0) {
-            duration += (beats / currentBpm) * 60;
-          } else {
-            hasValidDuration = false;
+          if (hasValidDuration) {
+            const beats = (currentMeasure[0] / currentMeasure[1]) * 4;
+            if (!isNaN(beats) && isFinite(beats) && beats >= 0 && currentBpm > 0 && beats <= 64) {
+              duration += (beats / currentBpm) * 60;
+            } else {
+              hasValidDuration = false;
+            }
           }
         } else if (['1', '2', '3', '4'].includes(char)) {
-           notesCount++;
+          notesCount++;
         }
       }
     }
   }
+
+  const isDurationSensible = hasValidDuration && isFinite(duration) && duration >= 0 && duration <= 86400 * 7;
 
   return {
     charCount,
     lineCount,
     measureCount,
     notesCount,
-    duration: hasValidDuration ? duration : null
+    duration: isDurationSensible ? duration : null,
+    maxMeasureBeats
   };
 }

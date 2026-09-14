@@ -55,6 +55,8 @@ export const state = {
   jiroCtx: null,
   cachedChartCanvas: null,
   isChartCacheDirty: false,
+  chartRenderAbortToken: 0,
+  isRenderingChart: false,
   comboBounceScale: 1.0,
   uploadedMusicFileName: "",
   uploadedMusicObjectURL: null,

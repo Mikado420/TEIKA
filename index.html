@@ -40,10 +40,10 @@
   <section class="pane-left">
       <div id="lightweight-banner" class="is-hidden" style="background: #4a3600; color: #ffca28; padding: 6px 10px; font-size: 12px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #6a4f00; z-index: 10;">
     <div>
-      <strong style="margin-right: 8px;">⚠ 軽量編集モード</strong>
-      <span>大きな譜面のため、自動解析を停止しています。</span>
+      <strong style="margin-right: 8px;">⚠ 軽量モードで動作中</strong>
+      <span>大きな譜面のため、重い処理を一時停止しています。</span>
     </div>
-    <button id="btn-force-parse" class="button" style="background: #6a4f00; border: none; color: #fff;">通常モードで解析</button>
+    <button id="btn-force-parse" class="button" style="background: #6a4f00; border: none; color: #fff; cursor: pointer; padding: 4px 8px; font-size: 12px;">通常モードに戻す</button>
   </div>
   <div class="area-editor">
       <!-- 1. 【レイアウト修正】「TJA EDITOR」の表記エリアを完全に削除し、エディタ縦幅を上方向に拡張 -->
@@ -250,24 +250,24 @@
   <div class="ios-install-guide-content" style="max-width: 400px; text-align: left;">
     <div id="heavy-chart-title" style="font-weight: bold; font-size: 16px; margin-bottom: 8px; color: #ff5555;">大きな譜面を検出しました</div>
     <div id="heavy-chart-desc" style="font-size: 13px; line-height: 1.5; margin-bottom: 16px; color: #e3e3e6;">
-      読み込み処理に1000ms以上かかったため、処理を一時停止しました。
+      この譜面の処理に時間がかかっているため、重い処理を一時停止しました。
     </div>
     
     <div style="background: #111113; padding: 10px; border-radius: 4px; border: 1px solid #3c3c4a; margin-bottom: 16px; font-size: 12px; color: #c9c9d4;">
       <div style="margin-bottom: 4px;"><strong>【譜面情報】</strong></div>
       <div style="display: flex; justify-content: space-between;"><span>文字数：</span><span id="heavy-info-chars">...</span></div>
       <div style="display: flex; justify-content: space-between;"><span>行数：</span><span id="heavy-info-lines">...</span></div>
-      <div style="display: flex; justify-content: space-between;"><span>譜面秒数：</span><span id="heavy-info-duration">...</span></div>
+      <div style="display: flex; justify-content: space-between;"><span>演奏時間：</span><span id="heavy-info-duration">...</span></div>
       <div style="display: flex; justify-content: space-between;"><span>小節数：</span><span id="heavy-info-measures">...</span></div>
       <div style="display: flex; justify-content: space-between;"><span>ノーツ数：</span><span id="heavy-info-notes">...</span></div>
     </div>
     
-    <div style="font-size: 13px; margin-bottom: 12px; color: #e3e3e6;">読み込み方法を選択してください。</div>
+    <div style="font-size: 13px; margin-bottom: 12px; color: #e3e3e6;"><strong>【読み込み方法】</strong></div>
     
     <div style="display: flex; flex-direction: column; gap: 8px;">
-      <button id="btn-heavy-normal" class="button" style="background: #2563eb; color: white; border: none; padding: 10px; font-size: 14px;">通常モードで読み込む</button>
-      <button id="btn-heavy-light" class="button" style="background: #4a3600; color: #ffca28; border: 1px solid #6a4f00; padding: 10px; font-size: 14px;">軽量モードで読み込む</button>
-      <button id="btn-heavy-delete" class="button is-hidden" style="background: #d32f2f; color: white; border: none; padding: 10px; font-size: 14px; margin-top: 8px;">削除して起動</button>
+      <button id="btn-heavy-normal" class="button" style="background: #2563eb; color: white; border: none; padding: 10px; font-size: 14px;">通常モードで処理を続行</button>
+      <button id="btn-heavy-light" class="button" style="background: #4a3600; color: #ffca28; border: 1px solid #6a4f00; padding: 10px; font-size: 14px;">軽量モードで編集</button>
+      <button id="btn-heavy-delete" class="button is-hidden" style="background: #d32f2f; color: white; border: none; padding: 10px; font-size: 14px; margin-top: 8px;">自動保存を削除</button>
     </div>
   </div>
 </div>

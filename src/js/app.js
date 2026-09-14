@@ -2,9 +2,9 @@ import { formatBpm, loadFileWithEncoding } from './utils.js';
 import { state, initDB, saveData, loadData } from './state.js';
 import { parseTJA, convertMCtoTJA, parseTJAForPreview, scanTJAInfo } from './tja-parser.js';
 import { textarea, updateLineNumbers, syncLineHeights, debouncedSyncLineHeights, syncScroll, updateHighlight, replaceGradation } from './editor.js';
-import { drawChart, getStats, drawDensityGraph } from './statistics.js';
+import { drawChart, drawChartAsync, getStats, drawDensityGraph } from './statistics.js';
 import { findMeasureIndex, initializeAudio, updateChartState, seekChartState, drawJiroPremiumNote, drawJiroBalloonNote, updateJiroPreview, setChartTime, startSimulation, stopSimulation, togglePlay, resetSimulation, seekToMeasure, playSE, updateComboDisplay, updateMeasureDisplay, autoHitCheck, updateLogic, updateJiroUIElements, drawLoop } from './preview.js';
-function updateUI() {
+function updateUI(startTime = 0) {
   u('.controls-diff .button').addClass('is-hidden');
   if (state.tjaParsed && state.tjaParsed.courses) Object.keys(state.tjaParsed.courses).forEach(d => u(`.btn-diff-${d}`).removeClass('is-hidden'));
   u('.button.is-active').removeClass('is-active');
@@ -12,7 +12,6 @@ function updateUI() {
   u(`.btn-page-${state.selectedPage}`).addClass('is-active');
   u('.page').addClass('is-hidden');
   u(`.page-${state.selectedPage}`).removeClass('is-hidden');
-  
   
   // Update toggle button text globally
   if (state.isChartImageVisible) {
@@ -41,63 +40,114 @@ function updateUI() {
 
   if (state.tjaParsed && state.selectedDifficulty !== '') {
     if (state.selectedPage === 'editor') {
+      // 【要件12】表示しないと生成しないを適切に分離
+      if (!state.isChartImageVisible || state.isLightweightMode) {
+        u('.page-editor').empty();
+        return;
+      }
+
       if (state.isChartCacheDirty || !state.cachedChartCanvas) {
-        state.cachedChartCanvas = drawChart(state.tjaParsed, state.selectedDifficulty);
-        state.isChartCacheDirty = false;
+        const token = ++state.chartRenderAbortToken;
+        state.isRenderingChart = true;
+
+        drawChartAsync(
+          state.tjaParsed,
+          state.selectedDifficulty,
+          startTime,
+          () => token !== state.chartRenderAbortToken || state.isLightweightMode || !state.isChartImageVisible
+        ).then(canvas => {
+          if (token !== state.chartRenderAbortToken) return;
+          state.isRenderingChart = false;
+          if (!canvas) return;
+          state.cachedChartCanvas = canvas;
+          state.isChartCacheDirty = false;
+
+          if (state.selectedPage === 'editor' && state.isChartImageVisible && !state.isLightweightMode) {
+            const viewCanvas = document.createElement('canvas');
+            viewCanvas.width = canvas.width;
+            viewCanvas.height = canvas.height;
+            viewCanvas.style.width = canvas.style.width;
+            viewCanvas.style.height = canvas.style.height;
+            const viewCtx = viewCanvas.getContext('2d');
+            if (viewCtx) viewCtx.drawImage(canvas, 0, 0);
+            u('.page-editor').empty().append(viewCanvas);
+            u('.page-editor').first().style.width = state.zoomLevel + '%';
+          }
+        }).catch(err => {
+          state.isRenderingChart = false;
+          if (err.message === 'HEAVY_CHART_ABORT') {
+            handleHeavyChartAbort(state.heavyChartRaw || u('.input').first().value, false);
+          } else {
+            console.error("Chart render error:", err);
+          }
+        });
+      } else if (state.cachedChartCanvas) {
+        const viewCanvas = document.createElement('canvas');
+        viewCanvas.width = state.cachedChartCanvas.width;
+        viewCanvas.height = state.cachedChartCanvas.height;
+        viewCanvas.style.width = state.cachedChartCanvas.style.width;
+        viewCanvas.style.height = state.cachedChartCanvas.style.height;
+        const viewCtx = viewCanvas.getContext('2d');
+        if (viewCtx) viewCtx.drawImage(state.cachedChartCanvas, 0, 0);
+        u('.page-editor').empty().append(viewCanvas);
+        u('.page-editor').first().style.width = state.zoomLevel + '%';
       }
-      const viewCanvas = document.createElement('canvas');
-      viewCanvas.width = state.cachedChartCanvas.width;
-      viewCanvas.height = state.cachedChartCanvas.height;
-      viewCanvas.style.width = state.cachedChartCanvas.style.width;
-      viewCanvas.style.height = state.cachedChartCanvas.style.height;
-      const viewCtx = viewCanvas.getContext('2d');
-      viewCtx.drawImage(state.cachedChartCanvas, 0, 0);
-      u('.page-editor').empty().append(viewCanvas);
-      u('.page-editor').first().style.width = state.zoomLevel + '%';
     } else if (state.selectedPage === 'preview') {
-      updateJiroPreview(state.currentElapsedTime);
+      if (!state.isLightweightMode) {
+        updateJiroPreview(state.currentElapsedTime);
+      }
     } else if (state.selectedPage === 'statistics') {
-      const s = getStats(state.tjaParsed, state.selectedDifficulty);
-      const dNames = ['かんたん', 'ふつう', 'むずかしい', 'おに', '裏おに'];
-      const c = state.tjaParsed.courses[state.selectedDifficulty];
-      u('#st-title').text(state.tjaParsed.headers.title);
-      u('#st-subtitle').text(state.tjaParsed.headers.subtitle || '');
-      u('#st-diff').text(`${dNames[c.course]} ★${c.headers.level}`);
-      let bStr = s.minBpm === s.maxBpm ? `${formatBpm(s.minBpm)}` : `${formatBpm(s.minBpm)}-${formatBpm(s.maxBpm)} (${formatBpm(s.mainBpm)})`;
-      u('#st-bpm').text(bStr);
-      u('#st-notes').text(s.combo);
-      u('#st-time').text(s.perfTime.toFixed(2) + "s");
-      u('#st-density').text(s.density.toFixed(3) + " /s");
-      let rendaHtml = `
-        <div style="margin-bottom: 6px;">
-          <div style="color: #8c8c9e; font-weight: bold; margin-bottom: 2px;">黄色連打</div>
-          <div style="word-break: break-all; color: #e3e3e6;">`;
-      if (s.rendas && s.rendas.length > 0) {
-        rendaHtml += `${s.rendas.map(r => r.toFixed(2) + "s").join(" + ")}<br>`;
-        rendaHtml += `(合計: ${s.rendas.reduce((a, b) => a + b, 0).toFixed(2)}s)`;
-      } else {
-        rendaHtml += `0.00s<br>(合計: 0.00s)`;
+      if (!state.isLightweightMode) {
+        try {
+          const s = getStats(state.tjaParsed, state.selectedDifficulty, startTime);
+          const dNames = ['かんたん', 'ふつう', 'むずかしい', 'おに', '裏おに'];
+          const c = state.tjaParsed.courses[state.selectedDifficulty];
+          u('#st-title').text(state.tjaParsed.headers.title);
+          u('#st-subtitle').text(state.tjaParsed.headers.subtitle || '');
+          u('#st-diff').text(`${dNames[c.course]} ★${c.headers.level}`);
+          let bStr = s.minBpm === s.maxBpm ? `${formatBpm(s.minBpm)}` : `${formatBpm(s.minBpm)}-${formatBpm(s.maxBpm)} (${formatBpm(s.mainBpm)})`;
+          u('#st-bpm').text(bStr);
+          u('#st-notes').text(s.combo);
+          u('#st-time').text(s.perfTime.toFixed(2) + "s");
+          u('#st-density').text(s.density.toFixed(3) + " /s");
+          let rendaHtml = `
+            <div style="margin-bottom: 6px;">
+              <div style="color: #8c8c9e; font-weight: bold; margin-bottom: 2px;">黄色連打</div>
+              <div style="word-break: break-all; color: #e3e3e6;">`;
+          if (s.rendas && s.rendas.length > 0) {
+            rendaHtml += `${s.rendas.map(r => r.toFixed(2) + "s").join(" + ")}<br>`;
+            rendaHtml += `(合計: ${s.rendas.reduce((a, b) => a + b, 0).toFixed(2)}s)`;
+          } else {
+            rendaHtml += `0.00s<br>(合計: 0.00s)`;
+          }
+          rendaHtml += `
+              </div>
+            </div>
+            <div>
+              <div style="color: #8c8c9e; font-weight: bold; margin-bottom: 2px;">風船連打</div>
+              <div style="word-break: break-all; color: #e3e3e6;">`;
+          const balloons = c.headers.balloon;
+          if (balloons && balloons.length > 0) {
+            const balloonSum = balloons.reduce((a, b) => a + b, 0);
+            rendaHtml += `${balloons.map(b => b + "打").join(" + ")}<br>`;
+            rendaHtml += `(合計: ${balloonSum}打)`;
+          } else {
+            rendaHtml += `なし<br>(合計: 0打)`;
+          }
+          rendaHtml += `
+              </div>
+            </div>
+          `;
+          u('#st-renda').html(rendaHtml);
+          drawDensityGraph(s.measures);
+        } catch (err) {
+          if (err.message === 'HEAVY_CHART_ABORT') {
+            handleHeavyChartAbort(state.heavyChartRaw || u('.input').first().value, false);
+          } else {
+            console.error("Stats calculation error:", err);
+          }
+        }
       }
-      rendaHtml += `
-          </div>
-        </div>
-        <div>
-          <div style="color: #8c8c9e; font-weight: bold; margin-bottom: 2px;">風船連打</div>
-          <div style="word-break: break-all; color: #e3e3e6;">`;
-      const balloons = c.headers.balloon;
-      if (balloons && balloons.length > 0) {
-        const balloonSum = balloons.reduce((a, b) => a + b, 0);
-        rendaHtml += `${balloons.map(b => b + "打").join(" + ")}<br>`;
-        rendaHtml += `(合計: ${balloonSum}打)`;
-      } else {
-        rendaHtml += `なし<br>(合計: 0打)`;
-      }
-      rendaHtml += `
-          </div>
-        </div>
-      `;
-      u('#st-renda').html(rendaHtml);
-      drawDensityGraph(s.measures);
     }
   }
 }
@@ -122,6 +172,32 @@ window.addEventListener('orientationchange', handleResize);
 textarea.addEventListener('scroll', syncScroll);
 
 
+// 自動保存を解析から完全に独立した処理として提供
+let autosaveTimer = null;
+export function saveTJAAutosave(val) {
+  if (autosaveTimer) clearTimeout(autosaveTimer);
+  autosaveTimer = setTimeout(() => {
+    try {
+      if (val !== undefined && val !== null) {
+        localStorage.setItem('tja_tools_autosave', val);
+      }
+    } catch (e) {
+      console.warn("Autosave failed:", e);
+    }
+  }, 150);
+}
+
+function handleHeavyChartAbort(val, isStartup = false) {
+  // 進行中の画像生成を破棄
+  state.chartRenderAbortToken++;
+  state.isRenderingChart = false;
+
+  state.isLightweightMode = true;
+  state.heavyChartRaw = val;
+  u('#lightweight-banner').removeClass('is-hidden');
+  showHeavyChartPopup(val, isStartup);
+}
+
 function showHeavyChartPopup(val, isStartup) {
   const info = scanTJAInfo(val);
   u('#heavy-info-chars').text(info.charCount.toLocaleString());
@@ -135,12 +211,13 @@ function showHeavyChartPopup(val, isStartup) {
     u('#heavy-chart-desc').text("起動時の自動解析を一時停止しました。復元方法を選択してください。");
     u('#btn-heavy-normal').text("通常モードで復元");
     u('#btn-heavy-light').text("軽量モードで復元");
+    u('#btn-heavy-delete').text("自動保存を削除");
     u('#btn-heavy-delete').removeClass('is-hidden');
   } else {
     u('#heavy-chart-title').text("大きな譜面を検出しました");
-    u('#heavy-chart-desc').text("読み込み処理に1000ms以上かかったため、処理を一時停止しました。");
-    u('#btn-heavy-normal').text("通常モードで読み込む");
-    u('#btn-heavy-light').text("軽量モードで読み込む");
+    u('#heavy-chart-desc').text("この譜面の処理に時間がかかっているため、重い処理を一時停止しました。");
+    u('#btn-heavy-normal').text("通常モードで処理を続行");
+    u('#btn-heavy-light').text("軽量モードで編集");
     u('#btn-heavy-delete').addClass('is-hidden');
   }
 
@@ -151,36 +228,7 @@ u('#btn-heavy-normal').on('click', () => {
   u('#heavy-chart-modal').removeClass('is-visible');
   state.isLightweightMode = false;
   u('#lightweight-banner').addClass('is-hidden');
-  
-  
-  if (state.heavyChartRaw) {
-    // 警告なしで通常モード強制実行
-    const val = state.heavyChartRaw;
-    state.heavyChartRaw = null;
-    
-    // 強制的にparseTJAを呼ぶ (timeoutなし = startTime=0)
-    try {
-      state.tjaParsed = parseTJA(val, 0);
-      if (!state.selectedDifficulty || !state.tjaParsed.courses[state.selectedDifficulty]) state.selectedDifficulty = Object.keys(state.tjaParsed.courses)[0];
-      const parsedForPreview = parseTJAForPreview(val, 0);
-      state.currentChartData = parsedForPreview.courses[state.selectedDifficulty] || null;
-      if (state.currentChartData) {
-        state.tjaParsed.headers.offset = parsedForPreview.globalConfig.OFFSET;
-        setChartTime(state.currentElapsedTime);
-      }
-      state.isChartCacheDirty = true;
-      updateUI();
-      u('.errors').text('✓ No error');
-      u('.area-errors').addClass('is-success');
-      if (state.errorLineNumber !== null) {
-        state.errorLineNumber = null;
-        updateHighlight();
-      }
-    } catch(e) {
-      u('.errors').text(e.message);
-      u('.area-errors').removeClass('is-success');
-    }
-  }
+  processFunc(true, false);
 });
 
 u('#btn-heavy-light').on('click', () => {
@@ -188,23 +236,29 @@ u('#btn-heavy-light').on('click', () => {
   state.isLightweightMode = true;
   state.heavyChartRaw = null;
   u('#lightweight-banner').removeClass('is-hidden');
-  
 });
 
 u('#btn-force-parse').on('click', () => {
-  // 軽量モードのバナーから手動で通常解析
+  // 軽量モードのバナーから手動で通常モードに戻す
   state.isLightweightMode = false;
   u('#lightweight-banner').addClass('is-hidden');
-  
-  processFunc(true); // 強制解析
+  processFunc(true, false);
 });
 
 u('#btn-heavy-delete').on('click', () => {
   localStorage.removeItem('tja_tools_autosave');
   u('#heavy-chart-modal').removeClass('is-visible');
   u('.input').first().value = '';
+  state.tjaParsed = null;
+  state.currentChartData = null;
+  state.cachedChartCanvas = null;
   state.isLightweightMode = false;
   state.heavyChartRaw = null;
+  u('#lightweight-banner').addClass('is-hidden');
+  u('.page-editor').empty();
+  updateUI();
+  u('.errors').text('✓ No error');
+  u('.area-errors').addClass('is-success');
 });
 
 
@@ -214,16 +268,21 @@ export const processFunc = (forceNormal = false, isStartup = false) => {
   if (!val) return;
   if (state.debounceTimer) clearTimeout(state.debounceTimer);
   state.debounceTimer = setTimeout(() => {
-    localStorage.setItem('tja_tools_autosave', val);
+    // 自動保存を確実に実行（解析・描画の成否に影響されない）
+    saveTJAAutosave(val);
 
+    // 軽量モード中は、重い処理（パース・画像・プレビュー・統計）を自動実行しない
     if (state.isLightweightMode && !forceNormal) {
       return;
     }
 
     try {
-      const startTime = forceNormal ? 0 : performance.now();
+      // 通常モードであっても 1000ms の安全装置を常に維持（フリーズ防止）
+      const startTime = performance.now();
       state.tjaParsed = parseTJA(val, startTime);
-      if (!state.selectedDifficulty || !state.tjaParsed.courses[state.selectedDifficulty]) state.selectedDifficulty = Object.keys(state.tjaParsed.courses)[0];
+      if (!state.selectedDifficulty || !state.tjaParsed.courses[state.selectedDifficulty]) {
+        state.selectedDifficulty = Object.keys(state.tjaParsed.courses)[0] || '';
+      }
       const parsedForPreview = parseTJAForPreview(val, startTime);
       state.currentChartData = parsedForPreview.courses[state.selectedDifficulty] || null;
       if (state.currentChartData) {
@@ -231,7 +290,7 @@ export const processFunc = (forceNormal = false, isStartup = false) => {
         setChartTime(state.currentElapsedTime);
       }
       state.isChartCacheDirty = true;
-      updateUI();
+      updateUI(startTime);
       u('.errors').text('✓ No error');
       u('.area-errors').addClass('is-success');
       if (state.errorLineNumber !== null) {
@@ -240,11 +299,7 @@ export const processFunc = (forceNormal = false, isStartup = false) => {
       }
     } catch (e) {
       if (e.message === 'HEAVY_CHART_ABORT') {
-        state.isLightweightMode = true;
-        state.heavyChartRaw = val;
-        showHeavyChartPopup(val, isStartup);
-        u('#lightweight-banner').removeClass('is-hidden');
-        
+        handleHeavyChartAbort(val, isStartup);
         return;
       }
       u('.errors').text(e.message);
@@ -260,7 +315,13 @@ export const processFunc = (forceNormal = false, isStartup = false) => {
   }, 150);
 };
 
-u('.input').on('input', processFunc);
+u('.input').on('input', () => {
+  const val = u('.input').first().value;
+  // 1. 自動保存を解析と完全に独立して即時スケジュール
+  saveTJAAutosave(val);
+  // 2. 解析・描画処理（軽量モードならスキップ）
+  processFunc(false, false);
+});
 
 u('#btn-open').on('click', () => u('#file-input').first().click());
 
@@ -356,6 +417,10 @@ u('#file-input').on('change', async e => {
 u('#btn-toggle-image').on('click', () => {
   state.isChartImageVisible = !state.isChartImageVisible;
   localStorage.setItem('teika_chart_image_visible', state.isChartImageVisible);
+  if (!state.isChartImageVisible) {
+    state.chartRenderAbortToken++;
+    state.isRenderingChart = false;
+  }
   updateUI();
   requestAnimationFrame(() => {
     syncLineHeights();
@@ -405,17 +470,38 @@ u('#btn-grad-replace').on('click', () => {
 
 u('.controls-diff .button[data-value]').on('click', e => {
   state.selectedDifficulty = u(e.target).data('value');
-  state.currentChartData = (parseTJAForPreview, scanTJAInfo(textarea.value) || {courses:{}}).courses[state.selectedDifficulty];
-  if (state.currentChartData) {
-    seekChartState(0);
-    setChartTime(0);
+  state.chartRenderAbortToken++;
+  state.isRenderingChart = false;
+  if (state.isLightweightMode) {
+    return; // 軽量モード中は重い再パースをスキップ
+  }
+  try {
+    const startTime = performance.now();
+    const parsedForPreview = parseTJAForPreview(textarea.value, startTime);
+    state.currentChartData = (parsedForPreview && parsedForPreview.courses) ? parsedForPreview.courses[state.selectedDifficulty] : null;
+    if (state.currentChartData) {
+      seekChartState(0);
+      setChartTime(0);
+    }
+  } catch (err) {
+    if (err.message === 'HEAVY_CHART_ABORT') {
+      handleHeavyChartAbort(textarea.value, false);
+      return;
+    }
   }
   state.isChartCacheDirty = true;
   updateUI();
 });
 
 u('.controls-page .button[data-value]').on('click', e => {
-  state.selectedPage = u(e.target).data('value');
+  const newPage = u(e.target).data('value');
+  if (state.selectedPage !== newPage) {
+    if (state.selectedPage === 'editor') {
+      state.chartRenderAbortToken++;
+      state.isRenderingChart = false;
+    }
+    state.selectedPage = newPage;
+  }
   if (state.selectedPage === 'preview') {
     u('.pane-left').addClass('is-hidden');
   } else {
@@ -635,16 +721,21 @@ window.addEventListener('DOMContentLoaded', async () => {
   
   const saved = localStorage.getItem('tja_tools_autosave');
   if (saved) {
+    // 1. まず「生のTJA文字列だけ」を確実に復元
     u('.input').first().value = saved;
-    // 起動時の軽量事前チェック (文字数10万以上 or 行数5000以上は無条件で巨大判定)
-    const PRE_CHECK_CHARS = 100000;
-    const PRE_CHECK_LINES = 5000;
-    if (saved.length > PRE_CHECK_CHARS || saved.split('\n').length > PRE_CHECK_LINES) {
-      state.isLightweightMode = true;
-      state.heavyChartRaw = saved;
-      showHeavyChartPopup(saved, true);
-      u('#lightweight-banner').removeClass('is-hidden');
-      
+    updateHighlight();
+
+    // 2. 高速・安全な事前スキャン (文字数、行数、小節数、ノーツ数、小節長、演奏時間の総合安全チェック)
+    const info = scanTJAInfo(saved);
+    const isHeavy = info.charCount > 30000 || 
+                    info.lineCount > 1500 || 
+                    info.measureCount > 400 || 
+                    info.notesCount > 3000 ||
+                    info.maxMeasureBeats > 16 ||
+                    info.duration === null;
+    if (isHeavy) {
+      // 重い解析・描画を開始する前に直ちにモーダルを表示してユーザーに選択させる
+      handleHeavyChartAbort(saved, true);
     } else {
       processFunc(false, true);
     }
