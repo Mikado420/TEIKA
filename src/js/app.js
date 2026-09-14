@@ -1,34 +1,62 @@
+import { formatBpm, loadFileWithEncoding } from './utils.js';
+import { state, initDB, saveData, loadData } from './state.js';
+import { parseTJA, convertMCtoTJA, parseTJAForPreview } from './tja-parser.js';
+import { textarea, updateLineNumbers, syncLineHeights, debouncedSyncLineHeights, syncScroll, updateHighlight, replaceGradation } from './editor.js';
+import { drawChart, getStats, drawDensityGraph } from './statistics.js';
+import { findMeasureIndex, initializeAudio, updateChartState, seekChartState, drawJiroPremiumNote, drawJiroBalloonNote, updateJiroPreview, setChartTime, startSimulation, stopSimulation, togglePlay, resetSimulation, seekToMeasure, playSE, updateComboDisplay, updateMeasureDisplay, autoHitCheck, updateLogic, updateJiroUIElements, drawLoop } from './preview.js';
 function updateUI() {
   u('.controls-diff .button').addClass('is-hidden');
-  if (tjaParsed && tjaParsed.courses) Object.keys(tjaParsed.courses).forEach(d => u(`.btn-diff-${d}`).removeClass('is-hidden'));
+  if (state.tjaParsed && state.tjaParsed.courses) Object.keys(state.tjaParsed.courses).forEach(d => u(`.btn-diff-${d}`).removeClass('is-hidden'));
   u('.button.is-active').removeClass('is-active');
-  u(`.btn-diff-${selectedDifficulty}`).addClass('is-active');
-  u(`.btn-page-${selectedPage}`).addClass('is-active');
+  u(`.btn-diff-${state.selectedDifficulty}`).addClass('is-active');
+  u(`.btn-page-${state.selectedPage}`).addClass('is-active');
   u('.page').addClass('is-hidden');
-  u(`.page-${selectedPage}`).removeClass('is-hidden');
-  if (tjaParsed && selectedDifficulty !== '') {
-    if (selectedPage === 'editor') {
-      if (isChartCacheDirty || !cachedChartCanvas) {
-        cachedChartCanvas = drawChart(tjaParsed, selectedDifficulty);
-        isChartCacheDirty = false;
+  u(`.page-${state.selectedPage}`).removeClass('is-hidden');
+  
+  
+  // Update toggle button text globally
+  if (state.isChartImageVisible) {
+    u('#btn-toggle-image').text('画像: ON');
+  } else {
+    u('#btn-toggle-image').text('画像: OFF');
+  }
+
+  // Show toggle button only on editor page
+  if (state.selectedPage === 'editor') {
+    u('#btn-toggle-image').removeClass('is-hidden');
+    if (state.isChartImageVisible) {
+      u('.pane-right').removeClass('is-hidden');
+    } else {
+      u('.pane-right').addClass('is-hidden');
+    }
+  } else {
+    u('#btn-toggle-image').addClass('is-hidden');
+    u('.pane-right').removeClass('is-hidden');
+  }
+
+  if (state.tjaParsed && state.selectedDifficulty !== '') {
+    if (state.selectedPage === 'editor') {
+      if (state.isChartCacheDirty || !state.cachedChartCanvas) {
+        state.cachedChartCanvas = drawChart(state.tjaParsed, state.selectedDifficulty);
+        state.isChartCacheDirty = false;
       }
       const viewCanvas = document.createElement('canvas');
-      viewCanvas.width = cachedChartCanvas.width;
-      viewCanvas.height = cachedChartCanvas.height;
-      viewCanvas.style.width = cachedChartCanvas.style.width;
-      viewCanvas.style.height = cachedChartCanvas.style.height;
+      viewCanvas.width = state.cachedChartCanvas.width;
+      viewCanvas.height = state.cachedChartCanvas.height;
+      viewCanvas.style.width = state.cachedChartCanvas.style.width;
+      viewCanvas.style.height = state.cachedChartCanvas.style.height;
       const viewCtx = viewCanvas.getContext('2d');
-      viewCtx.drawImage(cachedChartCanvas, 0, 0);
+      viewCtx.drawImage(state.cachedChartCanvas, 0, 0);
       u('.page-editor').empty().append(viewCanvas);
-      u('.page-editor').first().style.width = zoomLevel + '%';
-    } else if (selectedPage === 'preview') {
-      updateJiroPreview(currentElapsedTime);
-    } else if (selectedPage === 'statistics') {
-      const s = getStats(tjaParsed, selectedDifficulty);
+      u('.page-editor').first().style.width = state.zoomLevel + '%';
+    } else if (state.selectedPage === 'preview') {
+      updateJiroPreview(state.currentElapsedTime);
+    } else if (state.selectedPage === 'statistics') {
+      const s = getStats(state.tjaParsed, state.selectedDifficulty);
       const dNames = ['かんたん', 'ふつう', 'むずかしい', 'おに', '裏おに'];
-      const c = tjaParsed.courses[selectedDifficulty];
-      u('#st-title').text(tjaParsed.headers.title);
-      u('#st-subtitle').text(tjaParsed.headers.subtitle || '');
+      const c = state.tjaParsed.courses[state.selectedDifficulty];
+      u('#st-title').text(state.tjaParsed.headers.title);
+      u('#st-subtitle').text(state.tjaParsed.headers.subtitle || '');
       u('#st-diff').text(`${dNames[c.course]} ★${c.headers.level}`);
       let bStr = s.minBpm === s.maxBpm ? `${formatBpm(s.minBpm)}` : `${formatBpm(s.minBpm)}-${formatBpm(s.maxBpm)} (${formatBpm(s.mainBpm)})`;
       u('#st-bpm').text(bStr);
@@ -75,26 +103,26 @@ window.addEventListener('resize', syncLineHeights);
 
 textarea.addEventListener('scroll', syncScroll);
 
-const processFunc = () => {
+export const processFunc = () => {
   const val = u('.input').first().value;
   updateHighlight();
   if (!val) return;
-  if (debounceTimer) clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(() => {
+  if (state.debounceTimer) clearTimeout(state.debounceTimer);
+  state.debounceTimer = setTimeout(() => {
     try {
-      tjaParsed = parseTJA(val);
-      if (!selectedDifficulty || !tjaParsed.courses[selectedDifficulty]) selectedDifficulty = Object.keys(tjaParsed.courses)[0];
+      state.tjaParsed = parseTJA(val);
+      if (!state.selectedDifficulty || !state.tjaParsed.courses[state.selectedDifficulty]) state.selectedDifficulty = Object.keys(state.tjaParsed.courses)[0];
       const parsedForPreview = parseTJAForPreview(val);
-      currentChartData = parsedForPreview.courses[selectedDifficulty] || null;
-      if (currentChartData) {
-        tjaParsed.headers.offset = parsedForPreview.globalConfig.OFFSET;
-        setChartTime(currentElapsedTime);
+      state.currentChartData = parsedForPreview.courses[state.selectedDifficulty] || null;
+      if (state.currentChartData) {
+        state.tjaParsed.headers.offset = parsedForPreview.globalConfig.OFFSET;
+        setChartTime(state.currentElapsedTime);
       }
-      isChartCacheDirty = true;
+      state.isChartCacheDirty = true;
       updateUI();
       u('.errors').text('No error');
-      if (errorLineNumber !== null) {
-        errorLineNumber = null;
+      if (state.errorLineNumber !== null) {
+        state.errorLineNumber = null;
         updateHighlight();
       }
       localStorage.setItem('tja_tools_autosave', val);
@@ -102,9 +130,9 @@ const processFunc = () => {
       u('.errors').text(e.message);
       const match = e.message.match(/(?:行|line)\s*([0-9]+)/i);
       if (match) {
-        errorLineNumber = parseInt(match[1], 10);
+        state.errorLineNumber = parseInt(match[1], 10);
       } else {
-        errorLineNumber = null;
+        state.errorLineNumber = null;
       }
       updateHighlight();
     }
@@ -155,14 +183,14 @@ u('#file-input').on('change', async e => {
         initializeAudio();
         const audioData = await audioFileInZip.async("arraybuffer");
         try {
-          musicAudioBuffer = await audioContext.decodeAudioData(audioData);
-          uploadedMusicFileName = audioFileInZip.name.split('/').pop();
-          if (uploadedMusicObjectURL) URL.revokeObjectURL(uploadedMusicObjectURL);
-          uploadedMusicObjectURL = URL.createObjectURL(new Blob([audioData]));
-          u('#music-filename-display').text(`音源: ${uploadedMusicFileName}`);
+          state.musicAudioBuffer = await state.audioContext.decodeAudioData(audioData);
+          state.uploadedMusicFileName = audioFileInZip.name.split('/').pop();
+          if (state.uploadedMusicObjectURL) URL.revokeObjectURL(state.uploadedMusicObjectURL);
+          state.uploadedMusicObjectURL = URL.createObjectURL(new Blob([audioData]));
+          u('#music-filename-display').text(`音源: ${state.uploadedMusicFileName}`);
           await saveData('files', {
             id: 'music',
-            name: uploadedMusicFileName,
+            name: state.uploadedMusicFileName,
             data: new Blob([audioData])
           });
         } catch (decErr) {
@@ -175,14 +203,14 @@ u('#file-input').on('change', async e => {
     } else if (f.name.toLowerCase().match(/\.(mp3|m4a|wav|ogg)$/)) {
       initializeAudio();
       try {
-        musicAudioBuffer = await audioContext.decodeAudioData(ab.slice(0));
-        uploadedMusicFileName = f.name;
-        if (uploadedMusicObjectURL) URL.revokeObjectURL(uploadedMusicObjectURL);
-        uploadedMusicObjectURL = URL.createObjectURL(f);
-        u('#music-filename-display').text(`音源: ${uploadedMusicFileName}`);
+        state.musicAudioBuffer = await state.audioContext.decodeAudioData(ab.slice(0));
+        state.uploadedMusicFileName = f.name;
+        if (state.uploadedMusicObjectURL) URL.revokeObjectURL(state.uploadedMusicObjectURL);
+        state.uploadedMusicObjectURL = URL.createObjectURL(f);
+        u('#music-filename-display').text(`音源: ${state.uploadedMusicFileName}`);
         await saveData('files', {
           id: 'music',
-          name: uploadedMusicFileName,
+          name: state.uploadedMusicFileName,
           data: f
         });
       } catch (decErr) {
@@ -195,7 +223,7 @@ u('#file-input').on('change', async e => {
       content = f.name.endsWith('.mc') ? convertMCtoTJA(await loadFileWithEncoding(ab)) : await loadFileWithEncoding(ab);
     }
     u('.input').first().value = content;
-    isChartCacheDirty = true;
+    state.isChartCacheDirty = true;
     processFunc();
   } catch (err) {
     u('.errors').text(err.message);
@@ -203,15 +231,22 @@ u('#file-input').on('change', async e => {
   e.target.value = null;
 });
 
+
+u('#btn-toggle-image').on('click', () => {
+  state.isChartImageVisible = !state.isChartImageVisible;
+  localStorage.setItem('teika_chart_image_visible', state.isChartImageVisible);
+  updateUI();
+});
+
 u('#zoom-in').on('click', e => {
   e.preventDefault();
-  zoomLevel += 20;
+  state.zoomLevel += 20;
   updateUI();
 });
 
 u('#zoom-out').on('click', e => {
   e.preventDefault();
-  zoomLevel = Math.max(100, zoomLevel - 20);
+  state.zoomLevel = Math.max(100, state.zoomLevel - 20);
   updateUI();
 });
 
@@ -219,18 +254,18 @@ u('#btn-save').on('click', () => {
   const cv = u('canvas').first();
   if (!cv) return;
   const link = document.createElement('a');
-  link.download = (tjaParsed.headers.title || 'chart') + '.png';
+  link.download = (state.tjaParsed.headers.title || 'chart') + '.png';
   link.href = cv.toDataURL();
   link.click();
 });
 
 u('#btn-tja-save').on('click', () => {
-  if (!tjaParsed) return;
+  if (!state.tjaParsed) return;
   const codes = Encoding.convert(Encoding.stringToCode(u('.input').first().value), 'SJIS', 'UNICODE');
   const blob = new Blob([new Uint8Array(codes)], {
     type: 'application/octet-stream'
   });
-  const name = (tjaParsed.headers.wave || "chart.tja").split('.')[0] + ".tja";
+  const name = (state.tjaParsed.headers.wave || "chart.tja").split('.')[0] + ".tja";
   const link = document.createElement('a');
   link.download = name;
   link.href = URL.createObjectURL(blob);
@@ -243,19 +278,19 @@ u('#btn-grad-replace').on('click', () => {
 });
 
 u('.controls-diff .button[data-value]').on('click', e => {
-  selectedDifficulty = u(e.target).data('value');
-  currentChartData = preparePreviewChart(tjaParsed, selectedDifficulty);
-  if (currentChartData) {
+  state.selectedDifficulty = u(e.target).data('value');
+  state.currentChartData = (parseTJAForPreview(textarea.value) || {courses:{}}).courses[state.selectedDifficulty];
+  if (state.currentChartData) {
     seekChartState(0);
     setChartTime(0);
   }
-  isChartCacheDirty = true;
+  state.isChartCacheDirty = true;
   updateUI();
 });
 
 u('.controls-page .button[data-value]').on('click', e => {
-  selectedPage = u(e.target).data('value');
-  if (selectedPage === 'preview') {
+  state.selectedPage = u(e.target).data('value');
+  if (state.selectedPage === 'preview') {
     u('.pane-left').addClass('is-hidden');
   } else {
     u('.pane-left').removeClass('is-hidden');
@@ -276,15 +311,15 @@ u('.input').on('blur', () => {
 
 u('#jiro-speed').on('change', e => {
   const newSpeed = parseFloat(e.target.value) || 1.0;
-  if (isPlaying) {
-    const currentElapsedTimeTemp = currentElapsedTime;
-    if (musicSourceNode) {
-      musicSourceNode.playbackRate.value = newSpeed;
+  if (state.isPlaying) {
+    const currentElapsedTimeTemp = state.currentElapsedTime;
+    if (state.musicSourceNode) {
+      state.musicSourceNode.playbackRate.value = newSpeed;
     }
-    simulationStartOffset = currentElapsedTimeTemp;
-    simulationStartTime = audioContext ? audioContext.currentTime : 0;
+    state.simulationStartOffset = currentElapsedTimeTemp;
+    state.simulationStartTime = state.audioContext ? state.audioContext.currentTime : 0;
   }
-  playbackSpeed = newSpeed;
+  state.playbackSpeed = newSpeed;
 });
 
 u('#jiro-btn-play').on('click', togglePlay);
@@ -292,57 +327,57 @@ u('#jiro-btn-play').on('click', togglePlay);
 u('#jiro-btn-stop').on('click', resetSimulation);
 
 u('#jiro-btn-prev').on('click', () => {
-  if (!currentChartData) return;
-  const curIndex = findMeasureIndex(currentElapsedTime);
+  if (!state.currentChartData) return;
+  const curIndex = findMeasureIndex(state.currentElapsedTime);
   let targetIndex = curIndex;
-  if (curIndex > 0 && Math.abs(currentElapsedTime - currentChartData.allMeasureTimes[curIndex]) < 0.5) {
+  if (curIndex > 0 && Math.abs(state.currentElapsedTime - state.currentChartData.allMeasureTimes[curIndex]) < 0.5) {
     targetIndex = curIndex - 1;
   }
-  const targetTime = currentChartData.allMeasureTimes[targetIndex];
+  const targetTime = state.currentChartData.allMeasureTimes[targetIndex];
   setChartTime(targetTime);
 });
 
 u('#jiro-btn-next').on('click', () => {
-  if (!currentChartData) return;
-  const curIndex = findMeasureIndex(currentElapsedTime);
-  const totalMeasures = currentChartData.allMeasureTimes.length - 1;
+  if (!state.currentChartData) return;
+  const curIndex = findMeasureIndex(state.currentElapsedTime);
+  const totalMeasures = state.currentChartData.allMeasureTimes.length - 1;
   const targetIndex = Math.min(totalMeasures, curIndex + 1);
-  const targetTime = currentChartData.allMeasureTimes[targetIndex];
+  const targetTime = state.currentChartData.allMeasureTimes[targetIndex];
   setChartTime(targetTime);
 });
 
 u('#jiro-vol-music').on('input', e => {
-  musicVolume = parseFloat(e.target.value) / 100;
-  if (musicGainNode) musicGainNode.gain.value = musicVolume;
+  state.musicVolume = parseFloat(e.target.value) / 100;
+  if (state.musicGainNode) state.musicGainNode.gain.value = state.musicVolume;
 });
 
 u('#jiro-vol-se').on('input', e => {
-  seVolume = parseFloat(e.target.value) / 100;
-  if (seGainNode) seGainNode.gain.value = seVolume;
+  state.seVolume = parseFloat(e.target.value) / 100;
+  if (state.seGainNode) state.seGainNode.gain.value = state.seVolume;
 });
 
 // ドラッグ中の経過時間を追従させつつプレビュー
 
 // ドラッグ中の経過時間を追従させつつプレビュー
 u('#jiro-seekbar').on('input', e => {
-  if (!currentChartData) return;
-  const totalDuration = musicAudioBuffer ? Math.max(currentChartData.endTime, musicAudioBuffer.duration) : currentChartData.endTime;
+  if (!state.currentChartData) return;
+  const totalDuration = state.musicAudioBuffer ? Math.max(state.currentChartData.endTime, state.musicAudioBuffer.duration) : state.currentChartData.endTime;
   const ratio = parseFloat(e.target.value) / 1000;
   const time = ratio * totalDuration;
   u('#jiro-time-display').text(`${time.toFixed(2)} / ${totalDuration.toFixed(2)}s`);
-  currentElapsedTime = time;
+  state.currentElapsedTime = time;
   seekChartState(time);
   updateJiroPreview(time);
 });
 
 u('#jiro-seekbar').on('change', e => {
-  if (!currentChartData) return;
-  const totalDuration = musicAudioBuffer ? Math.max(currentChartData.endTime, musicAudioBuffer.duration) : currentChartData.endTime;
+  if (!state.currentChartData) return;
+  const totalDuration = state.musicAudioBuffer ? Math.max(state.currentChartData.endTime, state.musicAudioBuffer.duration) : state.currentChartData.endTime;
   const ratio = parseFloat(e.target.value) / 1000;
   const targetTime = ratio * totalDuration;
   let closestTime = 0;
   let minDiff = Infinity;
-  currentChartData.allMeasureTimes.forEach(t => {
+  state.currentChartData.allMeasureTimes.forEach(t => {
     const diff = Math.abs(t - targetTime);
     if (diff < minDiff) {
       minDiff = diff;
@@ -353,7 +388,7 @@ u('#jiro-seekbar').on('change', e => {
 });
 
 window.addEventListener('keydown', e => {
-  if (selectedPage !== 'preview') return;
+  if (state.selectedPage !== 'preview') return;
   const activeEl = document.activeElement;
   if (activeEl && (activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'INPUT')) return;
   if (e.key === ' ') {
@@ -362,43 +397,43 @@ window.addEventListener('keydown', e => {
     togglePlay();
     return;
   }
-  if (!isPlaying && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+  if (!state.isPlaying && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
     e.preventDefault();
-    if (!currentChartData || currentChartData.barlineTimes.length === 0) return;
-    if (e.key === 'ArrowUp') setChartTime(currentChartData.barlineTimes[currentChartData.barlineTimes.length - 1]);else if (e.key === 'ArrowDown') setChartTime(currentChartData.barlineTimes[0]);
+    if (!state.currentChartData || state.currentChartData.barlineTimes.length === 0) return;
+    if (e.key === 'ArrowUp') setChartTime(state.currentChartData.barlineTimes[state.currentChartData.barlineTimes.length - 1]);else if (e.key === 'ArrowDown') setChartTime(state.currentChartData.barlineTimes[0]);
     return;
   }
-  if (keyState[e.key]) {
+  if (state.keyState[e.key]) {
     e.preventDefault();
-    if (keyState[e.key].pressed) return;
-    keyState[e.key].pressed = true;
-    keyState[e.key].pressStartTime = performance.now();
-    keyState[e.key].currentInterval = KEY_REPEAT_INTERVAL_BASE;
+    if (state.keyState[e.key].pressed) return;
+    state.keyState[e.key].pressed = true;
+    state.keyState[e.key].pressStartTime = performance.now();
+    state.keyState[e.key].currentInterval = state.KEY_REPEAT_INTERVAL_BASE;
     seekToMeasure(e.key === 'ArrowLeft' ? -1 : 1);
-    keyState[e.key].timer = setTimeout(() => {
-      if (keyState[e.key].timer) clearInterval(keyState[e.key].timer);
-      keyState[e.key].timer = setInterval(() => {
-        const elapsedTime = performance.now() - keyState[e.key].pressStartTime;
-        const speedUpCount = Math.floor(elapsedTime / KEY_SPEED_UP_TIME);
-        const newInterval = KEY_REPEAT_INTERVAL_BASE / Math.pow(2, speedUpCount);
-        if (newInterval !== keyState[e.key].currentInterval) {
-          clearInterval(keyState[e.key].timer);
-          keyState[e.key].currentInterval = newInterval;
-          keyState[e.key].timer = setInterval(() => seekToMeasure(e.key === 'ArrowLeft' ? -1 : 1), keyState[e.key].currentInterval);
+    state.keyState[e.key].timer = setTimeout(() => {
+      if (state.keyState[e.key].timer) clearInterval(state.keyState[e.key].timer);
+      state.keyState[e.key].timer = setInterval(() => {
+        const elapsedTime = performance.now() - state.keyState[e.key].pressStartTime;
+        const speedUpCount = Math.floor(elapsedTime / state.KEY_SPEED_UP_TIME);
+        const newInterval = state.KEY_REPEAT_INTERVAL_BASE / Math.pow(2, speedUpCount);
+        if (newInterval !== state.keyState[e.key].currentInterval) {
+          clearInterval(state.keyState[e.key].timer);
+          state.keyState[e.key].currentInterval = newInterval;
+          state.keyState[e.key].timer = setInterval(() => seekToMeasure(e.key === 'ArrowLeft' ? -1 : 1), state.keyState[e.key].currentInterval);
         }
         seekToMeasure(e.key === 'ArrowLeft' ? -1 : 1);
-      }, keyState[e.key].currentInterval);
-    }, KEY_REPEAT_DELAY);
+      }, state.keyState[e.key].currentInterval);
+    }, state.KEY_REPEAT_DELAY);
   }
 });
 
 window.addEventListener('keyup', e => {
-  if (keyState[e.key]) {
+  if (state.keyState[e.key]) {
     e.preventDefault();
-    keyState[e.key].pressed = false;
-    if (keyState[e.key].timer) {
-      clearInterval(keyState[e.key].timer);
-      keyState[e.key].timer = null;
+    state.keyState[e.key].pressed = false;
+    if (state.keyState[e.key].timer) {
+      clearInterval(state.keyState[e.key].timer);
+      state.keyState[e.key].timer = null;
     }
   }
 });
@@ -409,18 +444,18 @@ window.addEventListener('keyup', e => {
 document.addEventListener('visibilitychange', async () => {
   if (document.hidden) {
     // バックグラウンド移行時：即座に一時停止し、オーディオスレッド・タイマースレッドを完全にクリーンアップして初期化
-    if (isPlaying) {
-      wasPlayingBeforeHidden = true;
+    if (state.isPlaying) {
+      state.wasPlayingBeforeHidden = true;
       stopSimulation();
     } else {
-      wasPlayingBeforeHidden = false;
+      state.wasPlayingBeforeHidden = false;
     }
   } else {
     // フォアグラウンド復帰時：AudioContextを非同期で確実に復旧
-    if (audioContext) {
-      if (audioContext.state === 'suspended' || audioContext.state === 'interrupted') {
+    if (state.audioContext) {
+      if (state.audioContext.state === 'suspended' || state.audioContext.state === 'interrupted') {
         try {
-          await audioContext.resume();
+          await state.audioContext.resume();
         } catch (e) {
           console.warn("VisibilityChange: resume failed", e);
         }
@@ -428,35 +463,35 @@ document.addEventListener('visibilitychange', async () => {
     }
 
     // 以前再生中だった場合、非同期のオーディオ準備を十分に待つため250msの安全ディレイを挟んで安定再開
-    if (wasPlayingBeforeHidden) {
-      wasPlayingBeforeHidden = false;
+    if (state.wasPlayingBeforeHidden) {
+      state.wasPlayingBeforeHidden = false;
       setTimeout(async () => {
         // すでに別スレッドで走っていないことを確認した上で起動 (startSimulation内部で時刻基準をキャリブレーションしてラグを完全相殺)
-        if (!isPlaying) {
+        if (!state.isPlaying) {
           await startSimulation();
         }
       }, 250);
     } else {
       // 【ラグ相殺】非表示中の蓄積されたラグを完全にクリーンアップし、復帰直前の正確な時間で演奏位置をリセット・再描画
-      seekChartState(currentElapsedTime);
-      updateJiroPreview(currentElapsedTime);
+      seekChartState(state.currentElapsedTime);
+      updateJiroPreview(state.currentElapsedTime);
     }
   }
 });
 
 window.addEventListener('focus', async () => {
-  if (audioContext && audioContext.state === 'suspended') {
+  if (state.audioContext && state.audioContext.state === 'suspended') {
     try {
-      await audioContext.resume();
+      await state.audioContext.resume();
     } catch (e) {}
   }
-  updateJiroPreview(currentElapsedTime);
+  updateJiroPreview(state.currentElapsedTime);
 });
 
 window.addEventListener('touchstart', async () => {
-  if (audioContext && audioContext.state === 'suspended') {
+  if (state.audioContext && state.audioContext.state === 'suspended') {
     try {
-      await audioContext.resume();
+      await state.audioContext.resume();
     } catch (e) {}
   }
 }, {
@@ -464,9 +499,9 @@ window.addEventListener('touchstart', async () => {
 });
 
 window.addEventListener('DOMContentLoaded', async () => {
-  jiroCanvas = document.getElementById('jiro-previewCanvas');
-  if (jiroCanvas) {
-    jiroCtx = jiroCanvas.getContext('2d');
+  state.jiroCanvas = document.getElementById('jiro-previewCanvas');
+  if (state.jiroCanvas) {
+    state.jiroCtx = state.jiroCanvas.getContext('2d');
   }
   await initDB();
   const saved = localStorage.getItem('tja_tools_autosave');
@@ -477,14 +512,91 @@ window.addEventListener('DOMContentLoaded', async () => {
   try {
     const musicFile = await loadData('files', 'music');
     if (musicFile && musicFile.data) {
-      uploadedMusicObjectURL = URL.createObjectURL(musicFile.data);
-      uploadedMusicFileName = musicFile.name;
+      state.uploadedMusicObjectURL = URL.createObjectURL(musicFile.data);
+      state.uploadedMusicFileName = musicFile.name;
       u('#music-filename-display').text(`音源: ${musicFile.name}`);
       initializeAudio();
       const arrayBuffer = await musicFile.data.arrayBuffer();
-      musicAudioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+      state.musicAudioBuffer = await state.audioContext.decodeAudioData(arrayBuffer);
     }
   } catch (error) {
     console.error("Failed to load music from DB:", error);
   }
 });
+
+// --- PWA: Service Worker Registration & Install Handling ---
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js', { scope: './' })
+      .then((registration) => {
+        console.log('[TEIKA PWA] Service Worker registered with scope:', registration.scope);
+      })
+      .catch((error) => {
+        console.error('[TEIKA PWA] Service Worker registration failed:', error);
+      });
+  });
+}
+
+// Check if running in standalone PWA mode
+const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+                     window.navigator.standalone === true;
+
+let deferredInstallPrompt = null;
+const installBtn = document.getElementById('btn-pwa-install');
+const iosGuide = document.getElementById('ios-install-guide');
+const closeIosGuideBtn = document.getElementById('btn-close-ios-guide');
+
+const isIOS = /iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase());
+
+if (!isStandalone) {
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    if (installBtn) {
+      installBtn.classList.remove('is-hidden');
+    }
+  });
+
+  if (isIOS && installBtn) {
+    installBtn.classList.remove('is-hidden');
+  }
+}
+
+if (installBtn) {
+  installBtn.addEventListener('click', async () => {
+    if (deferredInstallPrompt) {
+      deferredInstallPrompt.prompt();
+      const choiceResult = await deferredInstallPrompt.userChoice;
+      if (choiceResult.outcome === 'accepted') {
+        console.log('[TEIKA PWA] User accepted install prompt');
+        installBtn.classList.add('is-hidden');
+      }
+      deferredInstallPrompt = null;
+    } else if (isIOS) {
+      if (iosGuide) {
+        iosGuide.classList.remove('is-hidden');
+      }
+    } else {
+      alert('ブラウザのメニューから「ホーム画面に追加」または「アプリをインストール」を選択してください。');
+    }
+  });
+}
+
+if (closeIosGuideBtn && iosGuide) {
+  closeIosGuideBtn.addEventListener('click', () => {
+    iosGuide.classList.add('is-hidden');
+  });
+  iosGuide.addEventListener('click', (e) => {
+    if (e.target === iosGuide) {
+      iosGuide.classList.add('is-hidden');
+    }
+  });
+}
+
+window.addEventListener('appinstalled', () => {
+  deferredInstallPrompt = null;
+  if (installBtn) {
+    installBtn.classList.add('is-hidden');
+  }
+  console.log('[TEIKA PWA] Application was installed successfully');
+});updateUI();

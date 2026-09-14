@@ -1,13 +1,16 @@
+import { HIT_POSITION_X_DEFAULT, HIT_POSITION_X } from "./state.js";
+import { state, BASE_SCROLL_FACTOR, NOTE_COLORS, JUDGE_BAD } from './state.js';
+
 function triggerTaikoEffect(part, time) {
-  taikoEffects[part].active = true;
-  taikoEffects[part].startTime = time;
+  state.taikoEffects[part].active = true;
+  state.taikoEffects[part].startTime = time;
 }
 
 function clearTaikoEffects() {
-  for (const key in taikoEffects) {
-    taikoEffects[key].active = false;
+  for (const key in state.taikoEffects) {
+    state.taikoEffects[key].active = false;
   }
-  autoLastSide = 'L';
+  state.autoLastSide = 'L';
 }
 
 function triggerAutoHitSide(hitType, time, isBig = false) {
@@ -16,52 +19,52 @@ function triggerAutoHitSide(hitType, time, isBig = false) {
     if (isBig) {
       hitQueue.push({
         part: 'donR',
-        priority: positionPriority.donR
+        priority: state.positionPriority.donR
       });
       hitQueue.push({
         part: 'donL',
-        priority: positionPriority.donL
+        priority: state.positionPriority.donL
       });
-      autoLastSide = 'R';
+      state.autoLastSide = 'R';
     } else {
-      if (autoLastSide === 'L') {
+      if (state.autoLastSide === 'L') {
         hitQueue.push({
           part: 'donR',
-          priority: positionPriority.donR
+          priority: state.positionPriority.donR
         });
-        autoLastSide = 'R';
+        state.autoLastSide = 'R';
       } else {
         hitQueue.push({
           part: 'donL',
-          priority: positionPriority.donL
+          priority: state.positionPriority.donL
         });
-        autoLastSide = 'L';
+        state.autoLastSide = 'L';
       }
     }
   } else if (hitType === 'ka') {
     if (isBig) {
       hitQueue.push({
         part: 'kaR',
-        priority: positionPriority.kaR
+        priority: state.positionPriority.kaR
       });
       hitQueue.push({
         part: 'kaL',
-        priority: positionPriority.kaL
+        priority: state.positionPriority.kaL
       });
-      autoLastSide = 'R';
+      state.autoLastSide = 'R';
     } else {
-      if (autoLastSide === 'L') {
+      if (state.autoLastSide === 'L') {
         hitQueue.push({
           part: 'kaR',
-          priority: positionPriority.kaR
+          priority: state.positionPriority.kaR
         });
-        autoLastSide = 'R';
+        state.autoLastSide = 'R';
       } else {
         hitQueue.push({
           part: 'kaL',
-          priority: positionPriority.kaL
+          priority: state.positionPriority.kaL
         });
-        autoLastSide = 'L';
+        state.autoLastSide = 'L';
       }
     }
   }
@@ -97,36 +100,36 @@ function createSynthesizedAudioBuffer(ctx, type) {
 }
 
 async function loadAudioBuffer(url, key) {
-  if (!audioContext) return;
+  if (!state.audioContext) return;
   try {
     const response = await fetch(url);
     const arrayBuffer = await response.arrayBuffer();
-    audioBuffers[key] = await audioContext.decodeAudioData(arrayBuffer);
+    state.audioBuffers[key] = await state.audioContext.decodeAudioData(arrayBuffer);
   } catch (e) {
     console.warn(`Failed to load online audio, using synthesis fallback instead.`, e);
   }
 }
 
-function initializeAudio() {
-  if (!audioContext) {
+export function initializeAudio() {
+  if (!state.audioContext) {
     try {
-      audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      seGainNode = audioContext.createGain();
-      seGainNode.gain.value = seVolume;
-      seGainNode.connect(audioContext.destination);
-      musicGainNode = audioContext.createGain();
-      musicGainNode.gain.value = musicVolume;
-      musicGainNode.connect(audioContext.destination);
-      audioBuffers['don'] = createSynthesizedAudioBuffer(audioContext, 'don');
-      audioBuffers['ka'] = createSynthesizedAudioBuffer(audioContext, 'ka');
-      audioBuffers['balloon'] = createSynthesizedAudioBuffer(audioContext, 'balloon');
+      state.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      state.seGainNode = state.audioContext.createGain();
+      state.seGainNode.gain.value = state.seVolume;
+      state.seGainNode.connect(state.audioContext.destination);
+      state.musicGainNode = state.audioContext.createGain();
+      state.musicGainNode.gain.value = state.musicVolume;
+      state.musicGainNode.connect(state.audioContext.destination);
+      state.audioBuffers['don'] = createSynthesizedAudioBuffer(state.audioContext, 'don');
+      state.audioBuffers['ka'] = createSynthesizedAudioBuffer(state.audioContext, 'ka');
+      state.audioBuffers['balloon'] = createSynthesizedAudioBuffer(state.audioContext, 'balloon');
     } catch (e) {
       console.error("Web Audio API is not supported in this browser");
       return;
     }
   } else {
-    if (seGainNode) seGainNode.gain.value = seVolume;
-    if (musicGainNode) musicGainNode.gain.value = musicVolume;
+    if (state.seGainNode) state.seGainNode.gain.value = state.seVolume;
+    if (state.musicGainNode) state.musicGainNode.gain.value = state.musicVolume;
   }
   ['don', 'ka', 'balloon'].forEach(key => {
     const base64 = localStorage.getItem(`se_${key}`);
@@ -140,78 +143,78 @@ function initializeAudio() {
 }
 
 function playSEAtTime(type, audioTime) {
-  if (!audioContext || !audioBuffers[type] || !seGainNode) return;
-  const source = audioContext.createBufferSource();
-  source.buffer = audioBuffers[type];
-  source.connect(seGainNode);
+  if (!state.audioContext || !state.audioBuffers[type] || !state.seGainNode) return;
+  const source = state.audioContext.createBufferSource();
+  source.buffer = state.audioBuffers[type];
+  source.connect(state.seGainNode);
   source.start(audioTime);
 }
 
-function updateChartState(timeSec) {
-  if (!currentChartData) {
+export function updateChartState(timeSec) {
+  if (!state.currentChartData) {
     return;
   }
-  while (state_commandIndex < currentChartData.commands.length) {
-    const cmd = currentChartData.commands[state_commandIndex];
+  while (state.state_commandIndex < state.currentChartData.commands.length) {
+    const cmd = state.currentChartData.commands[state.state_commandIndex];
     if (cmd.time > timeSec) {
       break;
     }
     switch (cmd.type) {
       case 'BPMCHANGE':
-        state_currentBPM = cmd.value;
+        state.state_currentBPM = cmd.value;
         break;
       case 'GOGOSTART':
-        if (!state_isGogo) {
-          lastGogoStartTime = cmd.time;
+        if (!state.state_isGogo) {
+          state.lastGogoStartTime = cmd.time;
         }
-        state_isGogo = true;
+        state.state_isGogo = true;
         break;
       case 'GOGOEND':
-        state_isGogo = false;
+        state.state_isGogo = false;
         break;
     }
-    state_commandIndex++;
+    state.state_commandIndex++;
   }
-  u('#jiro-preview-container').toggleClass('gogo-time-bg', state_isGogo);
+  u('#jiro-preview-container').toggleClass('gogo-time-bg', state.state_isGogo);
 }
 
-function seekChartState(timeSec) {
-  state_commandIndex = 0;
-  state_currentBPM = tjaParsed ? tjaParsed.headers.bpm || 120 : 120;
-  state_isGogo = false;
-  state_jposStartTime = -Infinity;
-  state_jposDuration = 0;
-  state_jposStartX = HIT_POSITION_X_DEFAULT;
-  state_jposEndX = HIT_POSITION_X_DEFAULT;
-  state_jposEasing = 0;
-  lastGogoStartTime = -Infinity;
-  if (!currentChartData) {
+export function seekChartState(timeSec) {
+  state.state_commandIndex = 0;
+  state.state_currentBPM = state.tjaParsed ? state.tjaParsed.headers.bpm || 120 : 120;
+  state.state_isGogo = false;
+  state.state_jposStartTime = -Infinity;
+  state.state_jposDuration = 0;
+  state.state_jposStartX = HIT_POSITION_X_DEFAULT;
+  state.state_jposEndX = HIT_POSITION_X_DEFAULT;
+  state.state_jposEasing = 0;
+  state.lastGogoStartTime = -Infinity;
+  if (!state.currentChartData) {
     updateChartState(0);
     return;
   }
-  while (state_commandIndex < currentChartData.commands.length) {
-    const cmd = currentChartData.commands[state_commandIndex];
+  while (state.state_commandIndex < state.currentChartData.commands.length) {
+    const cmd = state.currentChartData.commands[state.state_commandIndex];
     if (cmd.time > timeSec) {
       break;
     }
     switch (cmd.type) {
       case 'BPMCHANGE':
-        state_currentBPM = cmd.value;
+        state.state_currentBPM = cmd.value;
         break;
       case 'GOGOSTART':
-        lastGogoStartTime = cmd.time;
-        state_isGogo = true;
+        state.lastGogoStartTime = cmd.time;
+        state.state_isGogo = true;
         break;
       case 'GOGOEND':
-        state_isGogo = false;
+        state.state_isGogo = false;
         break;
     }
-    state_commandIndex++;
+    state.state_commandIndex++;
   }
   updateChartState(timeSec);
 }
 
-function drawJiroPremiumNote(ctx, x, y, type) {
+export function drawJiroPremiumNote(ctx, x, y, type) {
   const isBig = type === '3' || type === '4' || type === '6' || type === '7';
   const r = isBig ? 26 : 17;
   const color = NOTE_COLORS[type] || '#FFFFFF';
@@ -229,7 +232,7 @@ function drawJiroPremiumNote(ctx, x, y, type) {
   ctx.fill();
 }
 
-function drawJiroBalloonNote(ctx, rx, ry, note) {
+export function drawJiroBalloonNote(ctx, rx, ry, note) {
   const x = Math.round(rx);
   const y = Math.round(ry);
   const r = 19;
@@ -268,16 +271,16 @@ function drawJiroBalloonNote(ctx, rx, ry, note) {
 // 【要件1＆3: 完全修正】描画レイヤー順「ゴーゴー背景 ➔ レーン ➔ 判定枠・オーラ ➔ ノーツ（最前面）」
 
 // 【要件1＆3: 完全修正】描画レイヤー順「ゴーゴー背景 ➔ レーン ➔ 判定枠・オーラ ➔ ノーツ（最前面）」
-function updateJiroPreview(time = currentElapsedTime) {
-  if (!jiroCanvas || !jiroCtx) {
-    jiroCanvas = document.getElementById('jiro-previewCanvas');
-    if (jiroCanvas) {
-      jiroCtx = jiroCanvas.getContext('2d');
+export function updateJiroPreview(time = state.currentElapsedTime) {
+  if (!state.jiroCanvas || !state.jiroCtx) {
+    state.jiroCanvas = document.getElementById('jiro-previewCanvas');
+    if (state.jiroCanvas) {
+      state.jiroCtx = state.jiroCanvas.getContext('2d');
     }
   }
-  if (!jiroCanvas || !jiroCtx) return;
-  if (!currentChartData) {
-    jiroCtx.clearRect(0, 0, jiroCanvas.width, jiroCanvas.height);
+  if (!state.jiroCanvas || !state.jiroCtx) return;
+  if (!state.currentChartData) {
+    state.jiroCtx.clearRect(0, 0, state.jiroCanvas.width, state.jiroCanvas.height);
     seekChartState(0);
     return;
   }
@@ -287,12 +290,12 @@ function updateJiroPreview(time = currentElapsedTime) {
   const rectHeight = container.clientHeight > 0 ? container.clientHeight : 150;
 
   // 【軽量化】サイズ変更時のみCanvasバッファサイズを設定してガタつきを完全に防止
-  if (jiroCanvas.width !== rectWidth * dpr || jiroCanvas.height !== rectHeight * dpr) {
-    jiroCanvas.width = rectWidth * dpr;
-    jiroCanvas.height = rectHeight * dpr;
+  if (state.jiroCanvas.width !== rectWidth * dpr || state.jiroCanvas.height !== rectHeight * dpr) {
+    state.jiroCanvas.width = rectWidth * dpr;
+    state.jiroCanvas.height = rectHeight * dpr;
   }
-  jiroCtx.resetTransform();
-  jiroCtx.scale(dpr, dpr);
+  state.jiroCtx.resetTransform();
+  state.jiroCtx.scale(dpr, dpr);
   const elapsedTime = time;
   const baseCenterY = rectHeight / 2;
   const canvasMargin = 100;
@@ -300,60 +303,60 @@ function updateJiroPreview(time = currentElapsedTime) {
   // ----------------------------------------------------
   // レイヤー 1: レーンの背景・ゴーゴー背景の描画（定位置に完全固定・最背面）
   // ----------------------------------------------------
-  jiroCtx.clearRect(0, 0, rectWidth, rectHeight);
+  state.jiroCtx.clearRect(0, 0, rectWidth, rectHeight);
   const laneHeight = 76;
   const laneTop = baseCenterY - laneHeight / 2;
 
   // レーン背景
-  jiroCtx.fillStyle = '#1b1b22';
-  jiroCtx.fillRect(110, laneTop, rectWidth - 110, laneHeight);
+  state.jiroCtx.fillStyle = '#1b1b22';
+  state.jiroCtx.fillRect(110, laneTop, rectWidth - 110, laneHeight);
 
   // ゴーゴー背景色の描画（色の濃さをほんの少し濃く維持）
-  if (state_isGogo) {
-    const grad = jiroCtx.createLinearGradient(110, 0, rectWidth, 0);
+  if (state.state_isGogo) {
+    const grad = state.jiroCtx.createLinearGradient(110, 0, rectWidth, 0);
     grad.addColorStop(0, 'rgba(255, 69, 0, 0.45)');
     grad.addColorStop(0.5, 'rgba(255, 140, 0, 0.22)');
     grad.addColorStop(1, 'rgba(255, 140, 0, 0.05)');
-    jiroCtx.fillStyle = grad;
-    jiroCtx.fillRect(110, laneTop, rectWidth - 110, laneHeight);
+    state.jiroCtx.fillStyle = grad;
+    state.jiroCtx.fillRect(110, laneTop, rectWidth - 110, laneHeight);
   }
 
   // レーン枠境界線
-  jiroCtx.strokeStyle = 'rgba(255,255,255,0.15)';
-  jiroCtx.lineWidth = 2;
-  jiroCtx.strokeRect(110, laneTop, rectWidth - 110, laneHeight);
+  state.jiroCtx.strokeStyle = 'rgba(255,255,255,0.15)';
+  state.jiroCtx.lineWidth = 2;
+  state.jiroCtx.strokeRect(110, laneTop, rectWidth - 110, laneHeight);
 
   // ----------------------------------------------------
   // レイヤー 2: レーン（小節線）の描画
   // ----------------------------------------------------
-  const drawBarlines = currentChartData.drawBarlines || [];
+  const drawBarlines = state.currentChartData.drawBarlines || [];
   for (let i = 0; i < drawBarlines.length; i++) {
     const note = drawBarlines[i];
     const {
       bpm,
       scroll
     } = note;
-    const pixelsPerSecondX = BASE_SCROLL_FACTOR * bpm * scroll * scrollMultiplier;
+    const pixelsPerSecondX = BASE_SCROLL_FACTOR * bpm * scroll * state.scrollMultiplier;
     const timeDiff = note.time - elapsedTime;
     const x = HIT_POSITION_X + timeDiff * pixelsPerSecondX;
 
     // 太鼓マスクの背面に入り込まないようクリップ
     if (x < 110 || x > rectWidth + canvasMargin || pixelsPerSecondX === 0) continue;
     if (!note.barlineVisible) continue;
-    jiroCtx.beginPath();
-    jiroCtx.moveTo(x, laneTop);
-    jiroCtx.lineTo(x, laneTop + laneHeight);
-    jiroCtx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
-    jiroCtx.lineWidth = 2;
-    jiroCtx.stroke();
+    state.jiroCtx.beginPath();
+    state.jiroCtx.moveTo(x, laneTop);
+    state.jiroCtx.lineTo(x, laneTop + laneHeight);
+    state.jiroCtx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+    state.jiroCtx.lineWidth = 2;
+    state.jiroCtx.stroke();
   }
 
   // ----------------------------------------------------
   // レイヤー 3: 判定枠（常時タイトオーラ ＆ 突入時高速破裂アニメ）の描画（※流れるノーツの背面に固定！）
   // ----------------------------------------------------
   const radiusNormal = 27.5;
-  if (state_isGogo) {
-    const gogoElapsed = elapsedTime - lastGogoStartTime;
+  if (state.state_isGogo) {
+    const gogoElapsed = elapsedTime - state.lastGogoStartTime;
     let auraScale = 1.0;
     let auraAlpha = 1.0;
     const animDuration = 0.28;
@@ -379,40 +382,40 @@ function updateJiroPreview(time = currentElapsedTime) {
     // オレンジ色のタイトオーラ円形グラデーション
     const innerRadius = radiusNormal * 0.95;
     const outerRadius = radiusNormal * 1.35 * auraScale;
-    jiroCtx.save();
-    const radGrad = jiroCtx.createRadialGradient(HIT_POSITION_X, baseCenterY, innerRadius, HIT_POSITION_X, baseCenterY, outerRadius);
+    state.jiroCtx.save();
+    const radGrad = state.jiroCtx.createRadialGradient(HIT_POSITION_X, baseCenterY, innerRadius, HIT_POSITION_X, baseCenterY, outerRadius);
     radGrad.addColorStop(0, `rgba(255, 90, 0, ${auraAlpha * 0.95})`);
     radGrad.addColorStop(0.4, `rgba(255, 140, 0, ${auraAlpha * 0.6})`);
     radGrad.addColorStop(1, 'rgba(255, 140, 0, 0)');
-    jiroCtx.beginPath();
-    jiroCtx.arc(HIT_POSITION_X, baseCenterY, outerRadius, 0, Math.PI * 2);
-    jiroCtx.fillStyle = radGrad;
-    jiroCtx.fill();
-    jiroCtx.restore();
+    state.jiroCtx.beginPath();
+    state.jiroCtx.arc(HIT_POSITION_X, baseCenterY, outerRadius, 0, Math.PI * 2);
+    state.jiroCtx.fillStyle = radGrad;
+    state.jiroCtx.fill();
+    state.jiroCtx.restore();
   }
 
   // 判定枠の本体白サークル
-  jiroCtx.beginPath();
-  jiroCtx.arc(HIT_POSITION_X, baseCenterY, radiusNormal, 0, Math.PI * 2);
-  jiroCtx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
-  jiroCtx.lineWidth = 2.5;
-  jiroCtx.stroke();
-  jiroCtx.beginPath();
-  jiroCtx.arc(HIT_POSITION_X, baseCenterY, 18.5, 0, Math.PI * 2);
-  jiroCtx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
-  jiroCtx.lineWidth = 1.5;
-  jiroCtx.stroke();
+  state.jiroCtx.beginPath();
+  state.jiroCtx.arc(HIT_POSITION_X, baseCenterY, radiusNormal, 0, Math.PI * 2);
+  state.jiroCtx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+  state.jiroCtx.lineWidth = 2.5;
+  state.jiroCtx.stroke();
+  state.jiroCtx.beginPath();
+  state.jiroCtx.arc(HIT_POSITION_X, baseCenterY, 18.5, 0, Math.PI * 2);
+  state.jiroCtx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+  state.jiroCtx.lineWidth = 1.5;
+  state.jiroCtx.stroke();
 
   // ----------------------------------------------------
   // レイヤー 4: 流れるノーツ（音符・連打・風船）の描画（最前面レイヤー！）
   // ----------------------------------------------------
-  const drawNormalNotes = currentChartData.drawNormalNotes || [];
+  const drawNormalNotes = state.currentChartData.drawNormalNotes || [];
   let activeRollNote = null;
 
   // インデックス降順（右側から順番に）で描画することにより、左側のノーツを最前面にする
   for (let i = drawNormalNotes.length - 1; i >= 0; i--) {
     const note = drawNormalNotes[i];
-    if (chartCoolDownUntil !== null && note.time < chartCoolDownUntil) {
+    if (state.chartCoolDownUntil !== null && note.time < state.chartCoolDownUntil) {
       if (note.type >= '5' && note.type <= '7' && note.endTime > elapsedTime) {} else {
         continue;
       }
@@ -421,7 +424,7 @@ function updateJiroPreview(time = currentElapsedTime) {
       bpm,
       scroll
     } = note;
-    const pixelsPerSecondX = BASE_SCROLL_FACTOR * bpm * scroll * scrollMultiplier;
+    const pixelsPerSecondX = BASE_SCROLL_FACTOR * bpm * scroll * state.scrollMultiplier;
     const timeDiff = note.time - elapsedTime;
     const x = HIT_POSITION_X + timeDiff * pixelsPerSecondX;
 
@@ -429,9 +432,9 @@ function updateJiroPreview(time = currentElapsedTime) {
     if (x < -canvasMargin || x > rectWidth + canvasMargin) continue;
     if (note.type >= '1' && note.type <= '4') {
       if (note.judgeResult === 'hit') continue;
-      drawJiroPremiumNote(jiroCtx, x, baseCenterY, note.type);
+      drawJiroPremiumNote(state.jiroCtx, x, baseCenterY, note.type);
     } else if (note.type === '5' || note.type === '6') {
-      const pixelsPerSecondX_End = BASE_SCROLL_FACTOR * bpm * scroll * scrollMultiplier;
+      const pixelsPerSecondX_End = BASE_SCROLL_FACTOR * bpm * scroll * state.scrollMultiplier;
       const endTimeDiff = note.endTime - elapsedTime;
       const endX = HIT_POSITION_X + endTimeDiff * pixelsPerSecondX_End;
       if (x < -canvasMargin && endX < -canvasMargin || x > rectWidth + canvasMargin && endX > rectWidth + canvasMargin) continue;
@@ -439,32 +442,32 @@ function updateJiroPreview(time = currentElapsedTime) {
       const isBig = note.type === '6';
       const size = isBig ? 26 : 17;
       const color = NOTE_COLORS[note.type];
-      jiroCtx.beginPath();
-      jiroCtx.moveTo(x, baseCenterY);
-      jiroCtx.lineTo(endX, baseCenterY);
-      jiroCtx.strokeStyle = '#000000';
-      jiroCtx.lineWidth = size * 2;
-      jiroCtx.lineCap = 'round';
-      jiroCtx.stroke();
-      jiroCtx.beginPath();
-      jiroCtx.moveTo(x, baseCenterY);
-      jiroCtx.lineTo(endX, baseCenterY);
-      jiroCtx.strokeStyle = '#FFFFFF';
-      jiroCtx.lineWidth = (size - 1.5) * 2;
-      jiroCtx.stroke();
-      jiroCtx.beginPath();
-      jiroCtx.moveTo(x, baseCenterY);
-      jiroCtx.lineTo(endX, baseCenterY);
-      jiroCtx.strokeStyle = color;
-      jiroCtx.lineWidth = (size - 3) * 2;
-      jiroCtx.stroke();
-      jiroCtx.lineCap = 'butt';
+      state.jiroCtx.beginPath();
+      state.jiroCtx.moveTo(x, baseCenterY);
+      state.jiroCtx.lineTo(endX, baseCenterY);
+      state.jiroCtx.strokeStyle = '#000000';
+      state.jiroCtx.lineWidth = size * 2;
+      state.jiroCtx.lineCap = 'round';
+      state.jiroCtx.stroke();
+      state.jiroCtx.beginPath();
+      state.jiroCtx.moveTo(x, baseCenterY);
+      state.jiroCtx.lineTo(endX, baseCenterY);
+      state.jiroCtx.strokeStyle = '#FFFFFF';
+      state.jiroCtx.lineWidth = (size - 1.5) * 2;
+      state.jiroCtx.stroke();
+      state.jiroCtx.beginPath();
+      state.jiroCtx.moveTo(x, baseCenterY);
+      state.jiroCtx.lineTo(endX, baseCenterY);
+      state.jiroCtx.strokeStyle = color;
+      state.jiroCtx.lineWidth = (size - 3) * 2;
+      state.jiroCtx.stroke();
+      state.jiroCtx.lineCap = 'butt';
       if (x >= -canvasMargin && x <= rectWidth + canvasMargin) {
-        drawJiroPremiumNote(jiroCtx, x, baseCenterY, note.type);
+        drawJiroPremiumNote(state.jiroCtx, x, baseCenterY, note.type);
       }
     } else if (note.type === '7') {
       if (note.judgeResult === 'hit' || note.judgeResult === 'miss') continue;
-      const pixelsPerSecondX_End = BASE_SCROLL_FACTOR * bpm * scroll * scrollMultiplier;
+      const pixelsPerSecondX_End = BASE_SCROLL_FACTOR * bpm * scroll * state.scrollMultiplier;
       const endTimeDiff = note.endTime - elapsedTime;
       const endX = HIT_POSITION_X + endTimeDiff * pixelsPerSecondX_End;
       let displayX = x,
@@ -485,50 +488,50 @@ function updateJiroPreview(time = currentElapsedTime) {
         }
       }
       if (displayX > rectWidth + canvasMargin || displayX < -canvasMargin) continue;
-      drawJiroBalloonNote(jiroCtx, displayX, baseCenterY, note);
+      drawJiroBalloonNote(state.jiroCtx, displayX, baseCenterY, note);
       const remainingHits = note.hits - note.currentHits;
-      jiroCtx.fillStyle = 'white';
-      jiroCtx.font = 'bold 20px Inter';
-      jiroCtx.textBaseline = 'middle';
-      jiroCtx.textAlign = 'center';
-      if (note.hits > 0 && note.judgeResult === 'pending') jiroCtx.fillText(remainingHits.toString(), displayX, baseCenterY);
+      state.jiroCtx.fillStyle = 'white';
+      state.jiroCtx.font = 'bold 20px Inter';
+      state.jiroCtx.textBaseline = 'middle';
+      state.jiroCtx.textAlign = 'center';
+      if (note.hits > 0 && note.judgeResult === 'pending') state.jiroCtx.fillText(remainingHits.toString(), displayX, baseCenterY);
     }
   }
 
   // ----------------------------------------------------
   // 5. 太鼓本体グラフィックの描画 (定位置に完全固定マスク)
   // ----------------------------------------------------
-  jiroCtx.fillStyle = '#111113';
-  jiroCtx.fillRect(0, 0, 110, rectHeight);
+  state.jiroCtx.fillStyle = '#111113';
+  state.jiroCtx.fillRect(0, 0, 110, rectHeight);
 
   // セパレータ境界線
-  jiroCtx.strokeStyle = '#222';
-  jiroCtx.lineWidth = 3;
-  jiroCtx.beginPath();
-  jiroCtx.moveTo(110, 0);
-  jiroCtx.lineTo(110, rectHeight);
-  jiroCtx.stroke();
+  state.jiroCtx.strokeStyle = '#222';
+  state.jiroCtx.lineWidth = 3;
+  state.jiroCtx.beginPath();
+  state.jiroCtx.moveTo(110, 0);
+  state.jiroCtx.lineTo(110, rectHeight);
+  state.jiroCtx.stroke();
   const taikoX = 55;
   const taikoY = baseCenterY;
   const taikoR = 43;
 
   // 太鼓の外輪
-  jiroCtx.beginPath();
-  jiroCtx.arc(taikoX, taikoY, taikoR, 0, Math.PI * 2);
-  jiroCtx.fillStyle = '#1e1e1e';
-  jiroCtx.fill();
-  jiroCtx.lineWidth = 4;
-  jiroCtx.strokeStyle = '#121212';
-  jiroCtx.stroke();
+  state.jiroCtx.beginPath();
+  state.jiroCtx.arc(taikoX, taikoY, taikoR, 0, Math.PI * 2);
+  state.jiroCtx.fillStyle = '#1e1e1e';
+  state.jiroCtx.fill();
+  state.jiroCtx.lineWidth = 4;
+  state.jiroCtx.strokeStyle = '#121212';
+  state.jiroCtx.stroke();
 
   // 太鼓の面
-  jiroCtx.beginPath();
-  jiroCtx.arc(taikoX, taikoY, taikoR - 11, 0, Math.PI * 2);
-  jiroCtx.fillStyle = '#2d2d2d';
-  jiroCtx.fill();
-  jiroCtx.lineWidth = 3;
-  jiroCtx.strokeStyle = '#1d1d1d';
-  jiroCtx.stroke();
+  state.jiroCtx.beginPath();
+  state.jiroCtx.arc(taikoX, taikoY, taikoR - 11, 0, Math.PI * 2);
+  state.jiroCtx.fillStyle = '#2d2d2d';
+  state.jiroCtx.fill();
+  state.jiroCtx.lineWidth = 3;
+  state.jiroCtx.strokeStyle = '#1d1d1d';
+  state.jiroCtx.stroke();
 
   // ----------------------------------------------------
   // 6. 太鼓ヒット時の面・縁の発光エフェクト
@@ -536,54 +539,54 @@ function updateJiroPreview(time = currentElapsedTime) {
   const rInner = taikoR - 11;
   const partsOrder = ['kaR', 'donR', 'donL', 'kaL'];
   partsOrder.forEach(part => {
-    const eff = taikoEffects[part];
+    const eff = state.taikoEffects[part];
     if (!eff.active) return;
-    const progress = (elapsedTime - eff.startTime) / EFFECT_DURATION;
+    const progress = (elapsedTime - eff.startTime) / state.EFFECT_DURATION;
     if (progress >= 1.0 || progress < 0) {
       eff.active = false;
       return;
     }
     const opacity = 1.0 - progress;
-    jiroCtx.save();
-    jiroCtx.beginPath();
+    state.jiroCtx.save();
+    state.jiroCtx.beginPath();
     if (part === 'donL') {
-      jiroCtx.arc(taikoX, taikoY, rInner, Math.PI * 0.5, Math.PI * 1.5, false);
-      jiroCtx.fillStyle = `rgba(244, 67, 54, ${opacity * 0.75})`;
-      jiroCtx.fill();
+      state.jiroCtx.arc(taikoX, taikoY, rInner, Math.PI * 0.5, Math.PI * 1.5, false);
+      state.jiroCtx.fillStyle = `rgba(244, 67, 54, ${opacity * 0.75})`;
+      state.jiroCtx.fill();
     } else if (part === 'donR') {
-      jiroCtx.arc(taikoX, taikoY, rInner, Math.PI * 1.5, Math.PI * 2.5, false);
-      jiroCtx.fillStyle = `rgba(244, 67, 54, ${opacity * 0.75})`;
-      jiroCtx.fill();
+      state.jiroCtx.arc(taikoX, taikoY, rInner, Math.PI * 1.5, Math.PI * 2.5, false);
+      state.jiroCtx.fillStyle = `rgba(244, 67, 54, ${opacity * 0.75})`;
+      state.jiroCtx.fill();
     } else if (part === 'kaL') {
-      jiroCtx.arc(taikoX, taikoY, taikoR, Math.PI * 0.5, Math.PI * 1.5, false);
-      jiroCtx.arc(taikoX, taikoY, rInner, Math.PI * 1.5, Math.PI * 0.5, true);
-      jiroCtx.closePath();
-      jiroCtx.fillStyle = `rgba(33, 150, 243, ${opacity * 0.75})`;
-      jiroCtx.fill();
+      state.jiroCtx.arc(taikoX, taikoY, taikoR, Math.PI * 0.5, Math.PI * 1.5, false);
+      state.jiroCtx.arc(taikoX, taikoY, rInner, Math.PI * 1.5, Math.PI * 0.5, true);
+      state.jiroCtx.closePath();
+      state.jiroCtx.fillStyle = `rgba(33, 150, 243, ${opacity * 0.75})`;
+      state.jiroCtx.fill();
     } else if (part === 'kaR') {
-      jiroCtx.arc(taikoX, taikoY, taikoR, Math.PI * 1.5, Math.PI * 2.5, false);
-      jiroCtx.arc(taikoX, taikoY, rInner, Math.PI * 2.5, Math.PI * 1.5, true);
-      jiroCtx.closePath();
-      jiroCtx.fillStyle = `rgba(33, 150, 243, ${opacity * 0.75})`;
-      jiroCtx.fill();
+      state.jiroCtx.arc(taikoX, taikoY, taikoR, Math.PI * 1.5, Math.PI * 2.5, false);
+      state.jiroCtx.arc(taikoX, taikoY, rInner, Math.PI * 2.5, Math.PI * 1.5, true);
+      state.jiroCtx.closePath();
+      state.jiroCtx.fillStyle = `rgba(33, 150, 243, ${opacity * 0.75})`;
+      state.jiroCtx.fill();
     }
-    jiroCtx.restore();
+    state.jiroCtx.restore();
   });
 
   // ----------------------------------------------------
   // 7. コンボ表示の描画 (最前面)
   // ----------------------------------------------------
-  if (currentCombo > 0) {
-    jiroCtx.save();
-    jiroCtx.fillStyle = '#ffffff';
-    jiroCtx.font = `bold ${Math.floor(22 * comboBounceScale)}px "Hiragino Kaku Gothic ProN", Meiryo, sans-serif`;
-    jiroCtx.textBaseline = 'middle';
-    jiroCtx.textAlign = 'center';
-    jiroCtx.strokeStyle = '#000000';
-    jiroCtx.lineWidth = 5;
-    jiroCtx.strokeText(`${currentCombo}`, taikoX, taikoY);
-    jiroCtx.fillText(`${currentCombo}`, taikoX, taikoY);
-    jiroCtx.restore();
+  if (state.currentCombo > 0) {
+    state.jiroCtx.save();
+    state.jiroCtx.fillStyle = '#ffffff';
+    state.jiroCtx.font = `bold ${Math.floor(22 * state.comboBounceScale)}px "Hiragino Kaku Gothic ProN", Meiryo, sans-serif`;
+    state.jiroCtx.textBaseline = 'middle';
+    state.jiroCtx.textAlign = 'center';
+    state.jiroCtx.strokeStyle = '#000000';
+    state.jiroCtx.lineWidth = 5;
+    state.jiroCtx.strokeText(`${state.currentCombo}`, taikoX, taikoY);
+    state.jiroCtx.fillText(`${state.currentCombo}`, taikoX, taikoY);
+    state.jiroCtx.restore();
   }
   const rollDisplay = u('#jiro-roll-display').first();
   if (rollDisplay) {
@@ -597,24 +600,24 @@ function updateJiroPreview(time = currentElapsedTime) {
   }
 }
 
-function setChartTime(time) {
+export function setChartTime(time) {
   clearTaikoEffects();
-  if (!currentChartData) {
-    currentElapsedTime = 0;
-    currentMeasureIndex = 0;
-    currentCombo = 0;
+  if (!state.currentChartData) {
+    state.currentElapsedTime = 0;
+    state.currentMeasureIndex = 0;
+    state.currentCombo = 0;
     updateComboDisplay();
     updateMeasureDisplay();
     seekChartState(0);
     updateJiroPreview(0);
     return;
   }
-  const wasPlaying = isPlaying;
+  const wasPlaying = state.isPlaying;
   if (wasPlaying) stopSimulation();
-  currentElapsedTime = time;
-  currentMeasureIndex = findMeasureIndex(time);
+  state.currentElapsedTime = time;
+  state.currentMeasureIndex = findMeasureIndex(time);
   let initialCombo = 0;
-  currentChartData.notes.forEach(note => {
+  state.currentChartData.notes.forEach(note => {
     note.seScheduled = false;
     if (note.time < time) {
       if (note.type >= '5' && note.type <= '7' && note.endTime > time) {
@@ -627,7 +630,7 @@ function setChartTime(time) {
         if (note.type === '7' && note.hits > 0) note.currentHits = note.hits;
         if (note.type === '5' || note.type === '6') {
           const duration = note.endTime - note.time;
-          note.currentHits = Math.floor(duration / (1.0 / autoRollSpeed));
+          note.currentHits = Math.floor(duration / (1.0 / state.autoRollSpeed));
         }
       }
     } else {
@@ -636,35 +639,35 @@ function setChartTime(time) {
       note.lastAutoHitTime = 0;
     }
   });
-  currentCombo = initialCombo;
+  state.currentCombo = initialCombo;
   updateComboDisplay();
   updateMeasureDisplay();
-  seekChartState(currentElapsedTime);
-  updateJiroPreview(currentElapsedTime);
+  seekChartState(state.currentElapsedTime);
+  updateJiroPreview(state.currentElapsedTime);
   if (wasPlaying) {
-    chartCoolDownUntil = null;
-    stopAtTime = null;
+    state.chartCoolDownUntil = null;
+    state.stopAtTime = null;
     startSimulation();
   }
 }
 
-async function startSimulation() {
-  if (isPlaying || !currentChartData) return;
+export async function startSimulation() {
+  if (state.isPlaying || !state.currentChartData) return;
 
   // 【堅牢化】再生開始前に古いタイマーの残留を完全に払拭（二重起動防止）
-  if (logicIntervalId) {
-    clearInterval(logicIntervalId);
-    logicIntervalId = null;
+  if (state.logicIntervalId) {
+    clearInterval(state.logicIntervalId);
+    state.logicIntervalId = null;
   }
-  if (animationFrameId) {
-    cancelAnimationFrame(animationFrameId);
-    animationFrameId = null;
+  if (state.animationFrameId) {
+    cancelAnimationFrame(state.animationFrameId);
+    state.animationFrameId = null;
   }
   initializeAudio();
-  if (audioContext) {
-    if (audioContext.state === 'suspended' || audioContext.state === 'interrupted') {
+  if (state.audioContext) {
+    if (state.audioContext.state === 'suspended' || state.audioContext.state === 'interrupted') {
       try {
-        await audioContext.resume();
+        await state.audioContext.resume();
       } catch (e) {
         console.error("Failed to resume AudioContext during startSimulation", e);
         stopSimulation();
@@ -672,139 +675,139 @@ async function startSimulation() {
       }
     }
   }
-  isPlaying = true;
-  const requiredWaveName = tjaParsed.headers.wave;
-  const isFileNameMatch = requiredWaveName && uploadedMusicFileName && requiredWaveName.toLowerCase() === uploadedMusicFileName.toLowerCase();
-  simulationStartOffset = currentElapsedTime;
-  simulationStartTime = audioContext ? audioContext.currentTime : 0;
+  state.isPlaying = true;
+  const requiredWaveName = state.tjaParsed.headers.wave;
+  const isFileNameMatch = requiredWaveName && state.uploadedMusicFileName && requiredWaveName.toLowerCase() === state.uploadedMusicFileName.toLowerCase();
+  state.simulationStartOffset = state.currentElapsedTime;
+  state.simulationStartTime = state.audioContext ? state.audioContext.currentTime : 0;
 
   // 【要件1: 修正】タイマー競合バグを排除するため、描画用とロジックフォールバック用タイムスタンプを個別にリセット
-  lastFrameTime = performance.now();
-  lastLogicTime = performance.now();
-  if (musicAudioBuffer && isFileNameMatch) {
-    musicSourceNode = audioContext.createBufferSource();
-    musicSourceNode.buffer = musicAudioBuffer;
-    musicSourceNode.playbackRate.value = playbackSpeed;
-    if ('preservesPitch' in musicSourceNode) {
-      musicSourceNode.preservesPitch = true;
+  state.lastFrameTime = performance.now();
+  state.lastLogicTime = performance.now();
+  if (state.musicAudioBuffer && isFileNameMatch) {
+    state.musicSourceNode = state.audioContext.createBufferSource();
+    state.musicSourceNode.buffer = state.musicAudioBuffer;
+    state.musicSourceNode.playbackRate.value = state.playbackSpeed;
+    if ('preservesPitch' in state.musicSourceNode) {
+      state.musicSourceNode.preservesPitch = true;
     }
-    musicSourceNode.connect(musicGainNode);
-    const offset = tjaParsed.headers.offset || 0;
-    const targetTime = coolDownTime + Math.max(0, offset);
-    if (simulationStartOffset < targetTime) {
-      let waitTime = targetTime - simulationStartOffset;
-      let realWaitTime = waitTime / playbackSpeed;
-      musicSourceNode.start(audioContext.currentTime + realWaitTime, 0);
+    state.musicSourceNode.connect(state.musicGainNode);
+    const offset = state.tjaParsed.headers.offset || 0;
+    const targetTime = state.coolDownTime + Math.max(0, offset);
+    if (state.simulationStartOffset < targetTime) {
+      let waitTime = targetTime - state.simulationStartOffset;
+      let realWaitTime = waitTime / state.playbackSpeed;
+      state.musicSourceNode.start(state.audioContext.currentTime + realWaitTime, 0);
     } else {
-      let playedRealTime = simulationStartOffset - targetTime;
+      let playedRealTime = state.simulationStartOffset - targetTime;
       let musicOffset = playedRealTime;
-      musicSourceNode.start(audioContext.currentTime, musicOffset);
+      state.musicSourceNode.start(state.audioContext.currentTime, musicOffset);
     }
   }
   u('#jiro-btn-play').text('一時停止');
-  lastAutoEffectTime = 0;
-  logicIntervalId = setInterval(updateLogic, 1000 / 240);
-  animationFrameId = requestAnimationFrame(drawLoop);
+  state.lastAutoEffectTime = 0;
+  state.logicIntervalId = setInterval(updateLogic, 1000 / 240);
+  state.animationFrameId = requestAnimationFrame(drawLoop);
 }
 
-function stopSimulation() {
-  if (!isPlaying) return;
-  isPlaying = false;
-  if (musicSourceNode) {
+export function stopSimulation() {
+  if (!state.isPlaying) return;
+  state.isPlaying = false;
+  if (state.musicSourceNode) {
     try {
-      musicSourceNode.stop();
+      state.musicSourceNode.stop();
     } catch (e) {}
-    musicSourceNode.disconnect();
-    musicSourceNode = null;
+    state.musicSourceNode.disconnect();
+    state.musicSourceNode = null;
   }
-  stopAtTime = null;
-  chartCoolDownUntil = null;
+  state.stopAtTime = null;
+  state.chartCoolDownUntil = null;
 
   // 【堅牢化】タイマーリークの可能性を完全に断つ
-  if (animationFrameId) {
-    cancelAnimationFrame(animationFrameId);
-    animationFrameId = null;
+  if (state.animationFrameId) {
+    cancelAnimationFrame(state.animationFrameId);
+    state.animationFrameId = null;
   }
-  if (logicIntervalId) {
-    clearInterval(logicIntervalId);
-    logicIntervalId = null;
+  if (state.logicIntervalId) {
+    clearInterval(state.logicIntervalId);
+    state.logicIntervalId = null;
   }
   u('#jiro-btn-play').text('再生');
   u('#jiro-judge-display').html('');
   u('#jiro-roll-display').html('');
   clearTaikoEffects();
-  updateJiroPreview(currentElapsedTime);
+  updateJiroPreview(state.currentElapsedTime);
 }
 
-function togglePlay() {
-  if (isPlaying) {
+export function togglePlay() {
+  if (state.isPlaying) {
     stopSimulation();
   } else {
     startSimulation();
   }
 }
 
-function resetSimulation() {
+export function resetSimulation() {
   stopSimulation();
   setChartTime(0);
 }
 
-function findMeasureIndex(time) {
-  if (!currentChartData) return 0;
+export function findMeasureIndex(time) {
+  if (!state.currentChartData) return 0;
   let index = 0;
-  for (let i = 0; i < currentChartData.allMeasureTimes.length; i++) {
-    if (currentChartData.allMeasureTimes[i] <= time) index = i;else break;
+  for (let i = 0; i < state.currentChartData.allMeasureTimes.length; i++) {
+    if (state.currentChartData.allMeasureTimes[i] <= time) index = i;else break;
   }
   return index;
 }
 
-function seekToMeasure(direction) {
-  if (isPlaying || !currentChartData) return;
-  const newMeasureIndex = Math.max(0, Math.min(currentChartData.allMeasureTimes.length - 1, currentMeasureIndex + direction));
-  setChartTime(currentChartData.allMeasureTimes[newMeasureIndex]);
+export function seekToMeasure(direction) {
+  if (state.isPlaying || !state.currentChartData) return;
+  const newMeasureIndex = Math.max(0, Math.min(state.currentChartData.allMeasureTimes.length - 1, state.currentMeasureIndex + direction));
+  setChartTime(state.currentChartData.allMeasureTimes[newMeasureIndex]);
 }
 
-function playSE(type) {
-  if (performance.now() - lastSEPlayTime[type] < 1000 / renderFPS) return;
-  if (!audioContext || !audioBuffers[type] || !seGainNode) return;
-  const source = audioContext.createBufferSource();
-  source.buffer = audioBuffers[type];
-  source.connect(seGainNode);
+export function playSE(type) {
+  if (performance.now() - state.lastSEPlayTime[type] < 1000 / state.renderFPS) return;
+  if (!state.audioContext || !state.audioBuffers[type] || !state.seGainNode) return;
+  const source = state.audioContext.createBufferSource();
+  source.buffer = state.audioBuffers[type];
+  source.connect(state.seGainNode);
   source.start(0);
-  lastSEPlayTime[type] = performance.now();
+  state.lastSEPlayTime[type] = performance.now();
 }
 
-function updateComboDisplay() {}
+export function updateComboDisplay() {}
 
-function updateMeasureDisplay() {
-  if (!currentChartData || !currentChartData.allMeasureTimes) {
+export function updateMeasureDisplay() {
+  if (!state.currentChartData || !state.currentChartData.allMeasureTimes) {
     u('#jiro-measure-display').text('');
     return;
   }
-  const currentMeasure = currentMeasureIndex + 1;
-  const totalMeasures = currentChartData.allMeasureTimes.length;
+  const currentMeasure = state.currentMeasureIndex + 1;
+  const totalMeasures = state.currentChartData.allMeasureTimes.length;
   u('#jiro-measure-display').text(`小節: ${currentMeasure} / ${totalMeasures}`);
 }
 
-function autoHitCheck(elapsedTime) {
-  if (!currentChartData) return;
+export function autoHitCheck(elapsedTime) {
+  if (!state.currentChartData) return;
 
   // 【軽量化】無駄なループを徹底的に排除した高速巡回
-  for (let i = 0; i < currentChartData.notes.length; i++) {
-    const note = currentChartData.notes[i];
+  for (let i = 0; i < state.currentChartData.notes.length; i++) {
+    const note = state.currentChartData.notes[i];
     if (note.judgeResult !== 'pending') continue;
 
     // 通常ノーツの処理
     if (note.type >= '1' && note.type <= '4') {
       // 【軽量・遅延ゼロ同期】ノーツ到達の120ms前にWeb Audio APIのオーディオ currentTime をベースに先読み予約
-      if (isPlaying && !note.seScheduled) {
+      if (state.isPlaying && !note.seScheduled) {
         const playTime = note.time;
         if (elapsedTime >= playTime - 0.12) {
-          const targetAudioTime = simulationStartTime + (playTime - simulationStartOffset) / playbackSpeed;
-          if (targetAudioTime >= audioContext.currentTime) {
+          const targetAudioTime = state.simulationStartTime + (playTime - state.simulationStartOffset) / state.playbackSpeed;
+          if (targetAudioTime >= state.audioContext.currentTime) {
             playSEAtTime(note.type === '1' || note.type === '3' ? 'don' : 'ka', targetAudioTime);
           } else {
-            playSEAtTime(note.type === '1' || note.type === '3' ? 'don' : 'ka', audioContext.currentTime);
+            playSEAtTime(note.type === '1' || note.type === '3' ? 'don' : 'ka', state.audioContext.currentTime);
           }
           note.seScheduled = true;
         }
@@ -813,20 +816,20 @@ function autoHitCheck(elapsedTime) {
       // 映像上の到達瞬間に画面エフェクトとコンボ加算
       if (elapsedTime >= note.time) {
         note.judgeResult = 'hit';
-        const timeSinceLastEffect = elapsedTime - lastAutoEffectTime;
+        const timeSinceLastEffect = elapsedTime - state.lastAutoEffectTime;
         if (timeSinceLastEffect >= 1.0 / 60.0) {
-          lastAutoEffectTime = elapsedTime;
+          state.lastAutoEffectTime = elapsedTime;
         }
         if (note.type === '1' || note.type === '3') {
           triggerAutoHitSide('don', elapsedTime, note.type === '3');
         } else if (note.type === '2' || note.type === '4') {
           triggerAutoHitSide('ka', elapsedTime, note.type === '4');
         }
-        currentCombo++;
-        comboBounceScale = 1.35;
+        state.currentCombo++;
+        state.comboBounceScale = 1.35;
       } else if (elapsedTime > note.time + JUDGE_BAD) {
         note.judgeResult = 'miss';
-        currentCombo = 0;
+        state.currentCombo = 0;
       }
     }
     // 連打・風船ノーツの処理
@@ -847,12 +850,12 @@ function autoHitCheck(elapsedTime) {
         if (note.lastAutoHitTime === 0) {
           note.lastAutoHitTime = note.time;
           note.currentHits = 1;
-          lastAutoEffectTime = elapsedTime;
-          playSEAtTime('don', audioContext.currentTime);
+          state.lastAutoEffectTime = elapsedTime;
+          playSEAtTime('don', state.audioContext.currentTime);
           triggerAutoHitSide('don', elapsedTime);
           if (note.type === '7' && note.hits > 0 && note.currentHits >= note.hits) {
             note.judgeResult = 'hit';
-            playSEAtTime('balloon', audioContext.currentTime);
+            playSEAtTime('balloon', state.audioContext.currentTime);
           }
         }
 
@@ -862,15 +865,15 @@ function autoHitCheck(elapsedTime) {
           const hits = Math.floor(timeSinceLastHit / hitInterval);
           note.lastAutoHitTime += hitInterval * hits;
           note.currentHits += hits;
-          const timeSinceLastEffect = elapsedTime - lastAutoEffectTime;
+          const timeSinceLastEffect = elapsedTime - state.lastAutoEffectTime;
           if (timeSinceLastEffect >= 1.0 / 60.0) {
-            lastAutoEffectTime = elapsedTime;
+            state.lastAutoEffectTime = elapsedTime;
           }
-          playSEAtTime('don', audioContext.currentTime);
+          playSEAtTime('don', state.audioContext.currentTime);
           triggerAutoHitSide('don', elapsedTime);
           if (note.type === '7' && note.hits > 0 && note.currentHits >= note.hits) {
             note.judgeResult = 'hit';
-            playSEAtTime('balloon', audioContext.currentTime);
+            playSEAtTime('balloon', state.audioContext.currentTime);
           }
         }
       } else if (elapsedTime > note.endTime) {
@@ -880,67 +883,67 @@ function autoHitCheck(elapsedTime) {
   }
 }
 
-function updateLogic() {
+export function updateLogic() {
   const now = performance.now();
-  if (audioContext && audioContext.state === 'running' && isPlaying) {
-    currentElapsedTime = simulationStartOffset + (audioContext.currentTime - simulationStartTime) * playbackSpeed;
-  } else if (isPlaying) {
+  if (state.audioContext && state.audioContext.state === 'running' && state.isPlaying) {
+    state.currentElapsedTime = state.simulationStartOffset + (state.audioContext.currentTime - state.simulationStartTime) * state.playbackSpeed;
+  } else if (state.isPlaying) {
     // 【要件1: 修正】FPS制限タイマーと完全に独立させた、ロジック経過時間専用フォールバックでフリーズを完全防止！
-    const delta = (now - lastLogicTime) / 1000.0;
-    currentElapsedTime += delta * playbackSpeed;
+    const delta = (now - state.lastLogicTime) / 1000.0;
+    state.currentElapsedTime += delta * state.playbackSpeed;
   }
-  lastLogicTime = now; // ロジック専用に更新
+  state.lastLogicTime = now; // ロジック専用に更新
 
-  if (chartCoolDownUntil !== null && currentElapsedTime >= chartCoolDownUntil) {
-    chartCoolDownUntil = null;
+  if (state.chartCoolDownUntil !== null && state.currentElapsedTime >= state.chartCoolDownUntil) {
+    state.chartCoolDownUntil = null;
   }
-  let chartEndTime = currentChartData ? currentChartData.endTime : 0;
-  let musicEndTime = musicAudioBuffer ? musicAudioBuffer.duration : 0;
+  let chartEndTime = state.currentChartData ? state.currentChartData.endTime : 0;
+  let musicEndTime = state.musicAudioBuffer ? state.musicAudioBuffer.duration : 0;
   let maxPlayTime = Math.max(chartEndTime, musicEndTime);
-  if (maxPlayTime > 0 && currentElapsedTime >= maxPlayTime) {
-    if (currentChartData && currentChartData.allMeasureTimes.length > 0) {
-      currentElapsedTime = currentChartData.allMeasureTimes[currentChartData.allMeasureTimes.length - 1];
-      currentMeasureIndex = currentChartData.allMeasureTimes.length - 1;
+  if (maxPlayTime > 0 && state.currentElapsedTime >= maxPlayTime) {
+    if (state.currentChartData && state.currentChartData.allMeasureTimes.length > 0) {
+      state.currentElapsedTime = state.currentChartData.allMeasureTimes[state.currentChartData.allMeasureTimes.length - 1];
+      state.currentMeasureIndex = state.currentChartData.allMeasureTimes.length - 1;
     } else {
-      currentElapsedTime = 0;
-      currentMeasureIndex = 0;
+      state.currentElapsedTime = 0;
+      state.currentMeasureIndex = 0;
     }
     stopSimulation();
     return;
   }
-  if (stopAtTime !== null && currentElapsedTime >= stopAtTime) {
+  if (state.stopAtTime !== null && state.currentElapsedTime >= state.stopAtTime) {
     stopSimulation();
-    currentElapsedTime = stopAtTime;
-    updateJiroPreview(currentElapsedTime);
+    state.currentElapsedTime = state.stopAtTime;
+    updateJiroPreview(state.currentElapsedTime);
     return;
   }
-  updateChartState(currentElapsedTime);
-  if (chartCoolDownUntil === null) {
-    autoHitCheck(currentElapsedTime);
+  updateChartState(state.currentElapsedTime);
+  if (state.chartCoolDownUntil === null) {
+    autoHitCheck(state.currentElapsedTime);
   }
   updateJiroUIElements();
 }
 
-function updateJiroUIElements() {
+export function updateJiroUIElements() {
   const now = performance.now();
-  if (now - lastUIUpdateTime < 100) return;
-  lastUIUpdateTime = now;
-  const totalDuration = musicAudioBuffer ? Math.max(currentChartData ? currentChartData.endTime : 0, musicAudioBuffer.duration) : currentChartData ? currentChartData.endTime : 0;
-  u('#jiro-time-display').text(`${currentElapsedTime.toFixed(2)} / ${totalDuration.toFixed(2)}s`);
-  currentMeasureIndex = findMeasureIndex(currentElapsedTime);
+  if (now - state.lastUIUpdateTime < 100) return;
+  state.lastUIUpdateTime = now;
+  const totalDuration = state.musicAudioBuffer ? Math.max(state.currentChartData ? state.currentChartData.endTime : 0, state.musicAudioBuffer.duration) : state.currentChartData ? state.currentChartData.endTime : 0;
+  u('#jiro-time-display').text(`${state.currentElapsedTime.toFixed(2)} / ${totalDuration.toFixed(2)}s`);
+  state.currentMeasureIndex = findMeasureIndex(state.currentElapsedTime);
   updateMeasureDisplay();
   const seekbar = u('#jiro-seekbar').first();
   if (seekbar && totalDuration > 0 && document.activeElement !== seekbar) {
-    seekbar.value = currentElapsedTime / totalDuration * 1000;
+    seekbar.value = state.currentElapsedTime / totalDuration * 1000;
   }
 }
 
-function drawLoop(timestamp) {
-  if (!isPlaying) return;
-  animationFrameId = requestAnimationFrame(drawLoop);
-  const elapsed = timestamp - lastFrameTime;
-  if (elapsed < 1000 / renderFPS) return;
-  lastFrameTime = timestamp - elapsed % (1000 / renderFPS); // 【要件1: 修正】ロジックに影響を与えない完全に独立した描画間隔制御
+export function drawLoop(timestamp) {
+  if (!state.isPlaying) return;
+  state.animationFrameId = requestAnimationFrame(drawLoop);
+  const elapsed = timestamp - state.lastFrameTime;
+  if (elapsed < 1000 / state.renderFPS) return;
+  state.lastFrameTime = timestamp - elapsed % (1000 / state.renderFPS); // 【要件1: 修正】ロジックに影響を与えない完全に独立した描画間隔制御
 
-  updateJiroPreview(currentElapsedTime);
+  updateJiroPreview(state.currentElapsedTime);
 }

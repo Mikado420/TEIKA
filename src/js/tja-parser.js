@@ -1,4 +1,6 @@
-function convertMCtoTJA(mcContent) {
+import { formatBpm, gcd, lcm } from './utils.js';
+
+export function convertMCtoTJA(mcContent) {
   const mc = JSON.parse(mcContent);
   let tja = "";
   const balloons = mc.note.filter(n => n.style === 6 && n.hits).map(n => n.hits).join(',');
@@ -196,7 +198,7 @@ function convertMCtoTJA(mcContent) {
   return tja;
 }
 
-function parseTJA(tja) {
+export function parseTJA(tja) {
   const lines = tja.split(/\r?\n/).map(l => l.trim());
   const headers = {
     title: '',
@@ -264,7 +266,7 @@ function parseTJA(tja) {
 // プレビュー用に元のTJAエディターから完全移植した高精度パース
 
 // プレビュー用に元のTJAエディターから完全移植した高精度パース
-function parseTJAForPreview(text) {
+export function parseTJAForPreview(text) {
   const lines = text.split('\n').map(line => {
     const commentIndex = line.indexOf('//');
     return commentIndex !== -1 ? line.substring(0, commentIndex).trim() : line.trim();

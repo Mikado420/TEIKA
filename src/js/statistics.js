@@ -1,3 +1,5 @@
+import { CHART_PADDING_TOP, CHART_PADDING_BOTTOM, CHART_BG, ROW_MARGIN_BOTTOM, ROW_HEIGHT_INFO, ROW_HEIGHT_NOTE, ROW_HEIGHT, ROW_OFFSET_NOTE_CENTER, ROW_LEADING, ROW_TRAILING, BEAT_WIDTH, NOTE_RADIUS, formatBpm, getNoteX, getRowY } from './utils.js';
+
 const drawLine = (ctx, sx, sy, ex, ey, w, s) => {
   ctx.beginPath();
   ctx.moveTo(sx, sy);
@@ -93,7 +95,7 @@ function renderPath(ctx, rs, sR, sB, eR, eB) {
   ctx.stroke();
 }
 
-function drawChart(chart, courseId) {
+export function drawChart(chart, courseId) {
   const course = chart.courses[courseId];
   if (!course) return document.createElement('canvas');
   const dNames = ['かんたん', 'ふつう', 'むずかしい', 'おに', '裏おに'];
@@ -246,7 +248,7 @@ function drawChart(chart, courseId) {
 /** 統計ロジック **/
 
 /** 統計ロジック **/
-function getStats(chart, courseId) {
+export function getStats(chart, courseId) {
   const course = chart.courses[courseId];
   let combo = 0,
     firstT = null,
@@ -320,7 +322,7 @@ function getStats(chart, courseId) {
   };
 }
 
-function drawDensityGraph(measureData) {
+export function drawDensityGraph(measureData) {
   const container = u('#density-svg-wrapper').first();
   const width = container.clientWidth;
   const height = 100;

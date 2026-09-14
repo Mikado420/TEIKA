@@ -104,7 +104,7 @@
       border-top: 1px solid #4a1c1c; 
       font-family: monospace;
     }
-    .is-hidden { display: none; }
+    .is-hidden { display: none !important; }
     
     /* 集中モード */
     body.focus-mode .area-errors {
@@ -122,3 +122,22 @@
     body.focus-mode .area-footer {
       padding: 4px 10px !important;
     }
+
+/* スマートフォン向けの操作性改善 (PWA UX) */
+@media (max-width: 768px) {
+  .area-footer {
+    padding: 10px 10px !important;
+    gap: 10px !important;
+  }
+  .button {
+    padding: 10px 14px !important;
+    font-size: 13px !important;
+    min-height: 38px;
+  }
+  .button-group {
+    gap: 8px !important;
+  }
+  /* エディタ領域とプレビュー領域を縦並びにして、それぞれ広く使えるようにする？ */
+  /* プロンプトで「画面幅に応じて現在のTEIKAのレイアウトを維持しつつ」とあるので、
+     横並びを無理に縦にはしない。ただしボタンは押しやすくする。 */
+}

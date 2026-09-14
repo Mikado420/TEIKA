@@ -3,7 +3,27 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>TJA Tools+</title>
+  <title>TEIKA</title>
+  <meta name="description" content="TEIKA - Web TJA Chart Editor & Simulator">
+  <meta property="og:title" content="TEIKA">
+  <meta property="og:description" content="TEIKA - Web TJA Chart Editor & Simulator">
+
+  <!-- PWA Manifest & Settings -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0f0f11">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="application-name" content="TEIKA">
+
+  <!-- iOS / Apple Meta Tags -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="TEIKA">
+  <link rel="apple-touch-icon" href="src/icons/apple-touch-icon.png">
+
+  <!-- Icons -->
+  <link rel="icon" type="image/svg+xml" href="src/icons/icon.svg">
+  <link rel="icon" type="image/png" sizes="192x192" href="src/icons/icon-192.png">
+
   <script src="https://unpkg.com/umbrellajs@3.3.0/umbrella.min.js"></script>
   <script src="https://d3js.org/d3.v7.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -185,21 +205,30 @@
     <button class="button" style="background:#23232d; color:#e3e3e6; border:1px solid #3c3c4a;" id="btn-open">読込</button>
     <button class="button" style="background:#15803d; color:white; border:none;" id="btn-tja-save">TJA</button>
     <button class="button" style="background:#15803d; color:white; border:none;" id="btn-save">PNG</button>
+    <button class="button is-hidden" style="background:#2563eb; color:white; border:none;" id="btn-pwa-install" title="ホーム画面に追加 / アプリをインストール">アプリ追加</button>
     <input type="file" id="file-input" class="is-hidden" accept="*/*">
     <div style="margin-left:auto; display:flex; gap:3px;">
+        <button class="button" id="btn-toggle-image" style="background:#23232d; color:#e3e3e6; border:1px solid #3c3c4a; margin-right: 5px;">譜面画像: ON</button>
         <button class="button" id="zoom-out" style="width:30px; padding:0;">－</button>
         <button class="button" id="zoom-in" style="width:30px; padding:0;">＋</button>
     </div>
   </div>
 </footer>
 
-<script src="src/js/utils.js"></script>
-<script src="src/js/globals.js"></script>
-<script src="src/js/tja-parser.js"></script>
-<script src="src/js/editor.js"></script>
-<script src="src/js/statistics.js"></script>
-<script src="src/js/preview.js"></script>
-<script src="src/js/app.js"></script>
+<!-- iOS PWA ホーム画面追加ガイドモーダル -->
+<div id="ios-install-guide" class="is-hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 16px;">
+  <div style="background: #1f1f26; border: 1px solid #3c3c4a; border-radius: 10px; padding: 18px; max-width: 320px; width: 100%; color: #e3e3e6; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+    <div style="font-weight: bold; font-size: 15px; margin-bottom: 12px; color: #ffffff;">ホーム画面に追加</div>
+    <div style="font-size: 13px; line-height: 1.6; text-align: left; margin-bottom: 16px; color: #b8b8c7;">
+      1. Safari下部の共有ボタン <span style="display:inline-block; font-size:16px;">⎙</span>（四角に上矢印）をタップします。<br>
+      2. メニューをスクロールし<strong>「ホーム画面に追加」</strong>を選択します。<br>
+      3. 右上の「追加」を押すと、アプリとして起動できるようになります。
+    </div>
+    <button id="btn-close-ios-guide" class="button" style="width: 100%; background: #2e2e3a; color: #ffffff; border: 1px solid #4a4a5a; padding: 8px 0;">閉じる</button>
+  </div>
+</div>
+
+<script type="module" src="src/js/app.js"></script>
 
 </body>
 </html>

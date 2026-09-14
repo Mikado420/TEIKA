@@ -1,0 +1,6 @@
+{
+  "name": "TEIKA",
+  "description": "TJA (Taiko no Tatsujin) web chart editor, simulation previewer, and statistics analyzer.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

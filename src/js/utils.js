@@ -1,33 +1,33 @@
 /** 定数 **/
-const CHART_PADDING_TOP = 130,
+export const CHART_PADDING_TOP = 130,
   CHART_PADDING_BOTTOM = 20,
   CHART_BG = '#cccccc';
 
-const ROW_MARGIN_BOTTOM = 20,
+export const ROW_MARGIN_BOTTOM = 20,
   ROW_HEIGHT_INFO = 18,
   ROW_HEIGHT_NOTE = 34,
   ROW_HEIGHT = ROW_HEIGHT_INFO + ROW_HEIGHT_NOTE;
 
-const ROW_OFFSET_NOTE_CENTER = ROW_HEIGHT_INFO + ROW_HEIGHT_NOTE / 2,
+export const ROW_OFFSET_NOTE_CENTER = ROW_HEIGHT_INFO + ROW_HEIGHT_NOTE / 2,
   ROW_LEADING = 30,
   ROW_TRAILING = 30,
   BEAT_WIDTH = 48,
   NOTE_RADIUS = 9;
 
-const formatBpm = val => Math.round(val * 1000) / 1000;
+export const formatBpm = val => Math.round(val * 1000) / 1000;
 
-const getNoteX = beat => ROW_LEADING + beat * BEAT_WIDTH;
+export const getNoteX = beat => ROW_LEADING + beat * BEAT_WIDTH;
 
-const getRowY = row => CHART_PADDING_TOP + (ROW_HEIGHT + ROW_MARGIN_BOTTOM) * row;
-
-/** mc2tja 統合ロジック **/
+export const getRowY = row => CHART_PADDING_TOP + (ROW_HEIGHT + ROW_MARGIN_BOTTOM) * row;
 
 /** mc2tja 統合ロジック **/
-const gcd = (a, b) => b ? gcd(b, a % b) : a;
 
-const lcm = (a, b) => a === 0 || b === 0 ? 0 : Math.abs(a * b) / gcd(a, b);
+/** mc2tja 統合ロジック **/
+export const gcd = (a, b) => b ? gcd(b, a % b) : a;
 
-async function loadFileWithEncoding(arrayBuffer) {
+export const lcm = (a, b) => a === 0 || b === 0 ? 0 : Math.abs(a * b) / gcd(a, b);
+
+export async function loadFileWithEncoding(arrayBuffer) {
   const ui8 = new Uint8Array(arrayBuffer);
   try {
     return new TextDecoder('utf-8', {
@@ -38,7 +38,7 @@ async function loadFileWithEncoding(arrayBuffer) {
   }
 }
 
-function calculateEasing(t, type) {
+export function calculateEasing(t, type) {
   switch (type) {
     case 0:
     default:
@@ -46,6 +46,6 @@ function calculateEasing(t, type) {
   }
 }
 
-function escapeHtml(string) {
+export function escapeHtml(string) {
   return string.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 }

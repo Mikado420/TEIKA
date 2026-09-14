@@ -1,5 +1,9 @@
+import { processFunc } from "./app.js";
+import { escapeHtml } from './utils.js';
+import { state } from './state.js';
+
 /** グラデーション置換ロジック **/
-function replaceGradation() {
+export function replaceGradation() {
   const editor = u('.input').first();
   let text = editor.value;
   const getInitialState = (fullText, startIndex) => {
@@ -264,7 +268,7 @@ function highlightTJA(text) {
   return highlightedLines.join('');
 }
 
-function updateLineNumbers(text) {
+export function updateLineNumbers(text) {
   const lineNumbers = u('.line-numbers').first();
   if (!lineNumbers) return;
   const lines = text.split('\n');
@@ -302,7 +306,7 @@ function updateLineNumbers(text) {
   }
   let html = "";
   for (let i = 0; i < lines.length; i++) {
-    const isError = i + 1 === errorLineNumber;
+    const isError = i + 1 === state.errorLineNumber;
     const bgStyle = isError ? "background: rgba(255, 0, 0, 0.2);" : "";
     let measureSuffix = "";
     if (measureStartMap[i] !== undefined) {
@@ -319,7 +323,7 @@ function updateLineNumbers(text) {
 // 【要件2: 修正】ズレを直した縦画面用のレイアウト同期＆バッチ処理設計
 
 // 【要件2: 修正】ズレを直した縦画面用のレイアウト同期＆バッチ処理設計
-function syncLineHeights() {
+export function syncLineHeights() {
   const container = u('.editor-container').first();
   if (!container) return;
   const highlightRows = container.querySelectorAll('.highlight-row');
@@ -347,14 +351,14 @@ function syncLineHeights() {
   syncScroll();
 }
 
-function debouncedSyncLineHeights() {
-  if (syncHeightTimeout) clearTimeout(syncHeightTimeout);
-  syncHeightTimeout = setTimeout(() => {
+export function debouncedSyncLineHeights() {
+  if (state.syncHeightTimeout) clearTimeout(state.syncHeightTimeout);
+  state.syncHeightTimeout = setTimeout(() => {
     syncLineHeights();
   }, 50);
 }
 
-function syncScroll() {
+export function syncScroll() {
   backdrop.scrollTop = textarea.scrollTop;
   backdrop.scrollLeft = textarea.scrollLeft;
   const lineNumbers = u('.line-numbers').first();
@@ -363,13 +367,16 @@ function syncScroll() {
   }
 }
 
-function updateHighlight() {
-  if (pendingHighlightUpdate) return;
-  pendingHighlightUpdate = true;
+export function updateHighlight() {
+  if (state.pendingHighlightUpdate) return;
+  state.pendingHighlightUpdate = true;
   requestAnimationFrame(() => {
     const text = textarea.value;
     highlightDiv.innerHTML = highlightTJA(text);
     updateLineNumbers(text);
-    pendingHighlightUpdate = false;
+    state.pendingHighlightUpdate = false;
   });
 }
+export const textarea = u('.input').first();
+export const backdrop = u('.backdrop').first();
+export const highlightDiv = u('.highlight').first();
