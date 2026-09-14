@@ -99,7 +99,15 @@ function updateUI() {
 
 /** エディタ文字色分け用のハイライトヘルパー (要件3仕様維持) **/
 
-window.addEventListener('resize', syncLineHeights);
+const handleResize = () => {
+  requestAnimationFrame(() => {
+    syncLineHeights();
+    syncScroll();
+    updateHighlight();
+  });
+};
+window.addEventListener('resize', handleResize);
+window.addEventListener('orientationchange', handleResize);
 
 textarea.addEventListener('scroll', syncScroll);
 

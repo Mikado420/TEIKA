@@ -263,7 +263,7 @@ function highlightTJA(text) {
       lineHtml = result;
     }
     const finalHtml = lineHtml === "" ? "&#8203;" : lineHtml;
-    return `<div class="highlight-row" style="width:100%; word-break:break-all;">${finalHtml}</div>`;
+    return `<div class="highlight-row" style="width:100%;">${finalHtml}</div>`;
   });
   return highlightedLines.join('');
 }

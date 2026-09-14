@@ -53,12 +53,22 @@
     .editor-container .backdrop, .area-editor .input, .editor-container .line-numbers {
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
       font-size: 12px !important;
+      font-weight: bold !important;
       line-height: 18px !important;
       letter-spacing: normal !important;
       word-spacing: normal !important;
-      white-space: pre !important; /* 横スクロール仕様に統一し、行の折り返しによる縦方向の累積ズレを物理的に抹消 */
+      white-space: pre !important;
       word-wrap: normal !important; 
-      word-break: keep-all !important;
+      word-break: normal !important;
+      text-indent: 0 !important;
+      tab-size: 4 !important;
+      box-sizing: border-box !important;
+      text-rendering: auto !important;
+      font-kerning: none !important;
+    }
+    .area-editor .input, .editor-container .backdrop {
+      padding: 8px 10px !important;
+      border: none !important;
     }
     .editor-container .highlight {
       margin: 0;
@@ -119,8 +129,11 @@
     @media (max-width: 768px) {
       .editor-container .backdrop, .area-editor .input, .editor-container .line-numbers {
         font-size: 11px !important;
-        line-height: 16px !important; /* 縦幅ズレを防ぐためフォントサイズ＆行高さを詰めて完璧に統一 */
-        white-space: pre !important; /* モバイルも折り返しを強制排除 */
+        line-height: 16px !important; 
+        white-space: pre !important; 
+        word-wrap: normal !important;
+        word-break: normal !important;
+        font-weight: bold !important;
       }
       .line-number-row {
         height: 16px !important;
